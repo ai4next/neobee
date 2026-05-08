@@ -22,7 +22,7 @@ export class IdeaSynthesisController extends StageController {
     const ideas = await chain.run(session, aggregate.researchBrief, allInsights, aggregate.reviews);
 
     this.store.setIdeas(session.id, ideas);
-    this.completeTask();
+    this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'idea.generated', 'idea_synthesis', { ideas });
     this.advance(session.id, 'graph_build');
   }

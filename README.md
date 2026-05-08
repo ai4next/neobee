@@ -17,6 +17,11 @@
 - `apps/web`：Vite + React 前端
 - `apps/server`：Nest 风格的 Node.js/Express 后端
 - `packages/shared`：前后端共享的 TypeScript 类型定义
+- `docs`：架构与产品设计文档
+
+## 设计文档
+
+- [架构与产品设计优化计划](./docs/architecture-redesign-plan.md)
 
 ## 技术栈
 

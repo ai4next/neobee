@@ -19,6 +19,8 @@ export type SessionStage =
   | 'graph_build'
   | 'summary';
 
+export type StageRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
 export interface SessionCheckpoint {
   completedStages: SessionStage[];
   currentStage: SessionStage | null;
@@ -211,10 +213,13 @@ export type SessionEventType =
   | 'task.completed';
 
 export interface TaskProgressPayload {
+  sessionId: string;
   stage: SessionStage;
   taskId: string;
-  status: 'running' | 'completed' | 'failed';
+  status: Extract<StageRunStatus, 'running' | 'completed' | 'failed'>;
   progress: number;
+  updatedAt: string;
+  error?: string;
   currentStep?: {
     name: string;
     data: Record<string, unknown>;

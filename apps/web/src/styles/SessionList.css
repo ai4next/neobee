@@ -28,6 +28,12 @@
   color: var(--ink);
 }
 
+.nb-session-list-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .nb-session-new-btn {
   width: 28px;
   height: 28px;
@@ -99,6 +105,11 @@
   font-size: 0.7rem;
   color: var(--muted);
   text-transform: capitalize;
+}
+
+.nb-session-item-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
 }
 
 .nb-session-item.active .nb-session-item-status {

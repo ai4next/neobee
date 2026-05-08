@@ -1,17 +1,39 @@
 import type { SessionAggregate, SessionStage } from '@neobee/shared';
 import { useTranslation } from 'react-i18next';
 import { stageMeta } from './stageMeta';
+import type { TaskProgressState } from '../hooks/useTaskProgress';
 import '../styles/StageNavBar.css';
 
 interface StageNavBarProps {
   session: SessionAggregate | null;
   selectedStage: SessionStage;
   onSelectStage: (stage: SessionStage) => void;
-  taskProgress?: Record<string, {
-    status: string;
-    progress: number;
-    currentStep?: { name: string; data: Record<string, unknown> };
-  }>;
+  taskProgress?: TaskProgressState;
+}
+
+function getStageMetric(session: SessionAggregate | null, stage: SessionStage): number | null {
+  if (!session) {
+    return null;
+  }
+
+  switch (stage) {
+    case 'deep_research':
+      return session.researchBrief?.signals.length ?? 0;
+    case 'expert_creation':
+      return session.experts.length;
+    case 'insight_refinement':
+      return session.rounds.length;
+    case 'cross_review':
+      return session.reviews.length;
+    case 'idea_synthesis':
+      return session.ideas.length;
+    case 'graph_build':
+      return session.graph.nodes.length;
+    case 'summary':
+      return session.summary?.bestIdeas.length ?? 0;
+    default:
+      return null;
+  }
 }
 
 export default function StageNavBar({
@@ -28,31 +50,28 @@ export default function StageNavBar({
       <div className="nb-stage-nav-bar-track">
         {stageMeta.map((meta, index) => {
           const isActive = currentStage === meta.stage;
-          const isCompleted = session && stageMeta.findIndex(m => m.stage === currentStage) > index;
+          const currentIndex = stageMeta.findIndex((item) => item.stage === currentStage);
+          const isCompleted = currentIndex > index;
           const isSelected = selectedStage === meta.stage;
           const progress = taskProgress[meta.stage];
+          const metric = getStageMetric(session, meta.stage);
 
           return (
-            <div key={meta.stage} className="nb-stage-nav-item-wrapper">
-              <button
-                className={`nb-stage-nav-bar-item ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
-                onClick={() => onSelectStage(meta.stage)}
-              >
-                <span className="nb-stage-nav-bar-code">{String(index + 1).padStart(2, '0')}</span>
+            <button
+              key={meta.stage}
+              className={`nb-stage-nav-bar-item ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+              onClick={() => onSelectStage(meta.stage)}
+            >
+              <span className="nb-stage-nav-bar-code">{String(index + 1).padStart(2, '0')}</span>
+              <span className="nb-stage-nav-bar-copy">
                 <span className="nb-stage-nav-bar-name">{t(meta.stage)}</span>
-                {isActive && <span className="nb-stage-nav-bar-dot" />}
-                {isActive && progress && progress.status === 'running' && (
-                  <span className="nb-stage-nav-bar-progress">{progress.progress}%</span>
-                )}
-              </button>
-              {index < stageMeta.length - 1 && (
-                <div className={`nb-stage-nav-bar-arrow ${isCompleted ? 'passed' : ''}`}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              )}
-            </div>
+                <span className="nb-stage-nav-bar-subline">
+                  {progress?.status === 'running' ? `${progress.progress}%` : t(isCompleted ? 'completed' : 'pending')}
+                  {metric !== null ? ` • ${metric}` : ''}
+                </span>
+              </span>
+              {isActive && <span className="nb-stage-nav-bar-dot" />}
+            </button>
           );
         })}
       </div>

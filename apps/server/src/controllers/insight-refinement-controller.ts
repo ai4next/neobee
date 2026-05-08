@@ -38,14 +38,26 @@ export class InsightRefinementController extends StageController {
         // Check pause
         const updated = this.store.get(session.id);
         if (updated?.session.status === 'paused') {
+          const checkpoint = updated.checkpoint ?? {
+            completedStages: [],
+            currentStage: 'insight_refinement',
+            stageProgress: 0,
+            researchBrief: updated.researchBrief,
+            experts: updated.experts,
+            rounds: updated.rounds,
+            reviews: updated.reviews,
+            ideas: updated.ideas,
+            graph: updated.graph,
+            insightRefinementCursor: null
+          };
           this.store.saveCheckpoint(session.id, {
-            ...updated.checkpoint!,
+            ...checkpoint,
             insightRefinementCursor: { expertIndex: expertIdx, roundIndex: round }
           });
           return;
         }
 
-        this.createStep(`round_${round}_started`, { expertId: expert.id });
+        this.createStep(session.id, `round_${round}_started`, { expertId: expert.id });
 
         const previousInsights = rounds
           .filter((r) => r.expertId === expert.id)
@@ -66,12 +78,12 @@ export class InsightRefinementController extends StageController {
           rounds.push({ round, expertId: expert.id, insights: [insight] });
         }
 
-        this.createStep(`round_${round}_completed`, { insightId: insight.id });
+        this.createStep(session.id, `round_${round}_completed`, { insightId: insight.id });
         this.store.setRounds(session.id, rounds);
       }
     }
 
-    this.completeTask();
+    this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'insight_refinement.completed', 'insight_refinement', { rounds });
     this.advance(session.id, 'cross_review');
   }

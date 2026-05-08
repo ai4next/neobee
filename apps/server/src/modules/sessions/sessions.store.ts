@@ -224,7 +224,7 @@ export class SessionStore {
   }
 
   list(): SessionAggregate[] {
-    return [...this.sessions.values()];
+    return [...this.sessions.values()].sort((a, b) => b.session.updatedAt.localeCompare(a.session.updatedAt));
   }
 
   get(sessionId: string): SessionAggregate | undefined {
@@ -282,6 +282,28 @@ export class SessionStore {
     if (aggregate) {
       aggregate.checkpoint = null;
     }
+  }
+
+  appendError(sessionId: string, message: string): void {
+    const aggregate = this.require(sessionId);
+    aggregate.errors = [...aggregate.errors, message];
+    aggregate.session.updatedAt = new Date().toISOString();
+
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO session_error (session_id, errors)
+      VALUES (?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET errors = excluded.errors
+    `).run(sessionId, JSON.stringify(aggregate.errors));
+
+    this.persistSession(aggregate);
+  }
+
+  clearErrors(sessionId: string): void {
+    const aggregate = this.require(sessionId);
+    aggregate.errors = [];
+    const db = getDb();
+    db.prepare('DELETE FROM session_error WHERE session_id = ?').run(sessionId);
   }
 
   setResearchBrief(sessionId: string, researchBrief: ResearchBrief): SessionAggregate {

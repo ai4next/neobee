@@ -1,7 +1,6 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import type { SessionEvent } from '@neobee/shared';
 import { SessionsService } from '../modules/sessions/sessions.service.js';
-import { EventBus } from '../lib/event-bus.js';
 import type { Server } from 'http';
 
 interface ClientMessage {
@@ -17,12 +16,10 @@ interface ConnectedClient {
 
 export function createWebSocketServer(
   sessionsService: SessionsService,
-  eventBus: EventBus,
+  _eventBus: unknown,
   server: Server
 ): WebSocketServer {
   const wss = new WebSocketServer({ server });
-
-  const clients: ConnectedClient[] = [];
 
   function send(ws: WebSocket, type: string, payload: unknown): void {
     if (ws.readyState === WebSocket.OPEN) {
@@ -30,53 +27,42 @@ export function createWebSocketServer(
     }
   }
 
-  function broadcast(sessionId: string, event: SessionEvent): void {
-    const message = JSON.stringify({ type: event.type, payload: event.payload });
-    for (const client of clients) {
-      if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(message);
-      }
+  function sendSessionState(ws: WebSocket, sessionId: string): void {
+    try {
+      const aggregate = sessionsService.getSessionState(sessionId);
+      send(ws, 'session_state', aggregate);
+      send(ws, 'session_events', sessionsService.getEvents(sessionId));
+    } catch {
+      send(ws, 'error', { message: 'Session not found' });
     }
   }
 
   wss.on('connection', (ws) => {
     const client: ConnectedClient = { ws, sessionId: null };
-    clients.push(client);
 
     ws.on('message', (data) => {
       try {
         const message: ClientMessage = JSON.parse(data.toString());
 
-        switch (message.type) {
-          case 'subscribe_session': {
-            const payload = message.payload as { sessionId: string };
-            const { sessionId } = payload;
-            client.sessionId = sessionId;
-
-            const unsub = eventBus.subscribe(sessionId, (event) => {
-              broadcast(sessionId, event);
-            });
-            client.unsubscribe = unsub;
-
-            try {
-              const aggregate = sessionsService.getSessionState(sessionId);
-              send(ws, 'session_state', aggregate);
-            } catch {
-              send(ws, 'error', { message: 'Session not found' });
-            }
-            break;
-          }
+        if (message.type !== 'subscribe_session') {
+          send(ws, 'error', { message: 'Unsupported message type' });
+          return;
         }
+
+        client.unsubscribe?.();
+        client.sessionId = message.payload.sessionId;
+        client.unsubscribe = sessionsService.addEventListener(client.sessionId, (event: SessionEvent) => {
+          send(ws, event.type === 'task.progress' ? 'task.progress' : 'event', event);
+          sendSessionState(ws, client.sessionId!);
+        });
+
+        sendSessionState(ws, client.sessionId);
       } catch (err) {
         send(ws, 'error', { message: err instanceof Error ? err.message : 'Unknown error' });
       }
     });
 
     ws.on('close', () => {
-      const index = clients.indexOf(client);
-      if (index !== -1) {
-        clients.splice(index, 1);
-      }
       client.unsubscribe?.();
     });
   });

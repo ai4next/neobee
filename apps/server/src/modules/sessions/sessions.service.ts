@@ -1,11 +1,11 @@
 import type { CreateSessionInput, SessionAggregate, SessionCheckpoint, SessionEvent, SessionStage } from '@neobee/shared';
 import { SessionStore } from './sessions.store.js';
 import { EventBus } from '../../lib/event-bus.js';
+import { taskTracker } from '../../lib/task-tracking.js';
 
 export class SessionsService {
   private readonly store: SessionStore;
   private readonly eventBus: EventBus;
-  private readonly eventListeners = new Map<string, Set<(event: SessionEvent) => void>>();
 
   constructor(store: SessionStore, eventBus: EventBus) {
     this.store = store;
@@ -19,29 +19,38 @@ export class SessionsService {
   }
 
   runSession(sessionId: string): SessionAggregate {
-    const aggregate = this.store.get(sessionId);
-    if (!aggregate) {
-      throw new Error(`Session not found: ${sessionId}`);
-    }
+    const aggregate = this.requireSession(sessionId);
+    this.store.clearErrors(sessionId);
     this.store.setStatus(sessionId, 'researching', 'deep_research');
-    return this.store.get(sessionId)!;
+    this.eventBus.emitRaw(sessionId, 'task.started', 'deep_research', { sessionId, stage: 'deep_research' });
+    return this.requireSession(sessionId);
   }
 
-  pauseSession(sessionId: string): void {
-    this.store.setStatus(sessionId, 'paused', this.store.get(sessionId)?.session.currentStage ?? 'topic_intake');
+  pauseSession(sessionId: string): SessionAggregate {
+    const aggregate = this.requireSession(sessionId);
+    const stage = aggregate.session.currentStage ?? 'topic_intake';
+    this.store.setStatus(sessionId, 'paused', stage);
+    this.eventBus.emitRaw(sessionId, 'session.paused', stage, {});
+    return this.requireSession(sessionId);
   }
 
-  resumeSession(sessionId: string): void {
-    const aggregate = this.store.get(sessionId);
-    if (!aggregate) return;
+  resumeSession(sessionId: string): SessionAggregate {
+    const aggregate = this.requireSession(sessionId);
     const stage = aggregate.session.currentStage ?? 'deep_research';
     const status = this.stageToStatus(stage);
     this.store.setStatus(sessionId, status as any, stage);
+    this.eventBus.emitRaw(sessionId, 'task.started', stage, { sessionId, stage });
+    return this.requireSession(sessionId);
   }
 
-  cancelSession(sessionId: string): void {
+  cancelSession(sessionId: string): SessionAggregate {
+    const aggregate = this.requireSession(sessionId);
+    const stage = aggregate.session.currentStage ?? 'topic_intake';
     this.store.setStatus(sessionId, 'failed', null);
     this.store.clearCheckpoint(sessionId);
+    this.store.appendError(sessionId, 'Session cancelled');
+    this.eventBus.emitRaw(sessionId, 'run.failed', stage, { error: 'Session cancelled' });
+    return this.requireSession(sessionId);
   }
 
   listSessions(): SessionAggregate[] {
@@ -49,11 +58,7 @@ export class SessionsService {
   }
 
   getSessionState(sessionId: string): SessionAggregate {
-    const aggregate = this.store.get(sessionId);
-    if (!aggregate) {
-      throw new Error(`Session not found: ${sessionId}`);
-    }
-    return aggregate;
+    return this.requireSession(sessionId);
   }
 
   getGraph(sessionId: string) {
@@ -65,15 +70,17 @@ export class SessionsService {
   }
 
   getEvents(sessionId: string): SessionEvent[] {
+    this.requireSession(sessionId);
     return this.store.getEvents(sessionId);
   }
 
   getCheckpoint(sessionId: string): SessionCheckpoint | null {
+    this.requireSession(sessionId);
     return this.store.getCheckpoint(sessionId);
   }
 
   getTaskWithSteps(sessionId: string, stage: SessionStage, page: number = 1, pageSize: number = 20) {
-    const { taskTracker } = require('../../lib/task-tracking.js');
+    this.requireSession(sessionId);
     const task = taskTracker.getTask(sessionId, stage);
     if (!task) {
       return { task: null, steps: [], totalSteps: 0, totalPages: 0 };
@@ -87,9 +94,9 @@ export class SessionsService {
 
     return {
       task,
-      steps: paginatedSteps.map((s: any) => ({
-        ...s,
-        data: JSON.parse(s.data)
+      steps: paginatedSteps.map((step) => ({
+        ...step,
+        data: JSON.parse(step.data)
       })),
       totalSteps,
       totalPages,
@@ -117,5 +124,13 @@ export class SessionsService {
       summary: 'completed'
     };
     return map[stage] ?? 'created';
+  }
+
+  private requireSession(sessionId: string): SessionAggregate {
+    const aggregate = this.store.get(sessionId);
+    if (!aggregate) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    return aggregate;
   }
 }

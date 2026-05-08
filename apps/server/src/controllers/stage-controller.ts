@@ -12,6 +12,7 @@ export abstract class StageController {
 
   private running = false;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private readonly inFlightSessions = new Set<string>();
 
   constructor(store: SessionStore, eventBus: EventBus, stage: SessionStage) {
     this.store = store;
@@ -28,6 +29,7 @@ export abstract class StageController {
 
   stop(): void {
     this.running = false;
+    this.inFlightSessions.clear();
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
@@ -40,12 +42,22 @@ export abstract class StageController {
     const sessions = this.store.findByCurrentStage(this.stage);
     for (const session of sessions) {
       if (!this.running) break;
-      // Only process sessions in active states (not paused/failed/completed)
       if (['paused', 'failed', 'completed'].includes(session.status)) continue;
+      if (this.inFlightSessions.has(session.id)) continue;
 
-      this.execute(session).catch((err) => {
-        console.error(`[${this.stage}] Error executing session ${session.id}:`, err);
-      });
+      this.inFlightSessions.add(session.id);
+      this.execute(session)
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : 'Unknown stage error';
+          this.store.appendError(session.id, `[${this.stage}] ${message}`);
+          taskTracker.completeTask(session.id, this.stage, 'failed', message);
+          this.store.setStatus(session.id, 'failed', this.stage);
+          this.eventBus.emitRaw(session.id, 'run.failed', this.stage, { error: message });
+          console.error(`[${this.stage}] Error executing session ${session.id}:`, err);
+        })
+        .finally(() => {
+          this.inFlightSessions.delete(session.id);
+        });
     }
   }
 
@@ -73,15 +85,15 @@ export abstract class StageController {
     taskTracker.createTask(sessionId, this.stage);
   }
 
-  protected createStep(name: string, data: Record<string, unknown> = {}): void {
-    taskTracker.createStep(null, this.stage, name, data);
+  protected createStep(sessionId: string, name: string, data: Record<string, unknown> = {}): void {
+    taskTracker.createStep(sessionId, this.stage, name, data);
   }
 
-  protected updateProgress(progress: number): void {
-    taskTracker.updateTaskProgress(this.stage, progress);
+  protected updateProgress(sessionId: string, progress: number): void {
+    taskTracker.updateTaskProgress(sessionId, this.stage, progress);
   }
 
-  protected completeTask(): void {
-    taskTracker.completeTask(this.stage);
+  protected completeTask(sessionId: string): void {
+    taskTracker.completeTask(sessionId, this.stage);
   }
 }

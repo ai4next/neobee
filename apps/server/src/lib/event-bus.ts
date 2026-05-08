@@ -1,9 +1,15 @@
 import type { SessionEvent, SessionEventType, SessionStage } from '@neobee/shared';
 
-type EventListener = (event: SessionEvent) => void;
+type EventListener = (event: SessionEvent<any>) => void;
+type EventRecorder = (event: SessionEvent<any>) => void;
 
 export class EventBus {
-  private listeners = new Map<string, Set<EventListener>>();
+  private readonly listeners = new Map<string, Set<EventListener>>();
+  private recorder: EventRecorder | null = null;
+
+  setRecorder(recorder: EventRecorder): void {
+    this.recorder = recorder;
+  }
 
   subscribe(sessionId: string, listener: EventListener): () => void {
     if (!this.listeners.has(sessionId)) {
@@ -17,9 +23,14 @@ export class EventBus {
     this.listeners.get(sessionId)?.delete(listener);
   }
 
-  emit(event: SessionEvent): void {
+  emit(event: SessionEvent<any>): void {
+    this.recorder?.(event);
+
     const listeners = this.listeners.get(event.sessionId);
-    if (!listeners) return;
+    if (!listeners) {
+      return;
+    }
+
     for (const listener of listeners) {
       try {
         listener(event);
@@ -29,8 +40,13 @@ export class EventBus {
     }
   }
 
-  emitRaw(sessionId: string, type: SessionEventType, stage: SessionStage, payload: Record<string, unknown> = {}): void {
-    const event: SessionEvent = {
+  emitRaw<TPayload = Record<string, unknown>>(
+    sessionId: string,
+    type: SessionEventType,
+    stage: SessionStage,
+    payload: TPayload = {} as TPayload
+  ): SessionEvent<TPayload> {
+    const event: SessionEvent<TPayload> = {
       id: crypto.randomUUID(),
       sessionId,
       type,
@@ -39,5 +55,6 @@ export class EventBus {
       payload
     };
     this.emit(event);
+    return event;
   }
 }

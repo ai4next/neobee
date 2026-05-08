@@ -22,7 +22,7 @@ export class CrossReviewController extends StageController {
     const reviews = await chain.run(aggregate.experts, allInsights);
 
     this.store.setReviews(session.id, reviews);
-    this.completeTask();
+    this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'review.completed', 'cross_review', { reviews });
     this.advance(session.id, 'idea_synthesis');
   }

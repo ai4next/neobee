@@ -1,10 +1,10 @@
 import { getDb } from './db.js';
-import type { SessionStage, SessionEventType } from '@neobee/shared';
+import type { SessionStage, StageRunStatus, TaskProgressPayload } from '@neobee/shared';
 
 export interface TaskRecord {
   id: string;
   sessionId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: Extract<StageRunStatus, 'pending' | 'running' | 'completed' | 'failed'>;
   progress: number;
   createdAt: string;
   updatedAt: string;
@@ -19,17 +19,33 @@ export interface StepRecord {
   updatedAt: string;
 }
 
-export type TaskProgressCallback = (event: {
+export type TaskProgressCallback = (event: TaskProgressPayload) => void;
+
+type TaskTableName =
+  | 'topic_intake_task'
+  | 'deep_research_task'
+  | 'expert_creation_task'
+  | 'insight_refinement_task'
+  | 'cross_review_task'
+  | 'idea_synthesis_task'
+  | 'graph_build_task'
+  | 'summary_task';
+
+type StepTableName =
+  | 'topic_intake_step'
+  | 'deep_research_step'
+  | 'expert_creation_step'
+  | 'insight_refinement_step'
+  | 'cross_review_step'
+  | 'idea_synthesis_step'
+  | 'graph_build_step'
+  | 'summary_step';
+
+interface TaskContext {
+  taskId: string;
   sessionId: string;
   stage: SessionStage;
-  taskId: string;
-  status: 'running' | 'completed' | 'failed';
-  progress: number;
-  currentStep?: { name: string; data: Record<string, unknown> };
-}) => void;
-
-type TaskTableName = 'topic_intake_task' | 'deep_research_task' | 'expert_creation_task' | 'insight_refinement_task' | 'cross_review_task' | 'idea_synthesis_task' | 'graph_build_task' | 'summary_task';
-type StepTableName = 'topic_intake_step' | 'deep_research_step' | 'expert_creation_step' | 'insight_refinement_step' | 'cross_review_step' | 'idea_synthesis_step' | 'graph_build_step' | 'summary_step';
+}
 
 const TASK_TABLE_MAP: Record<SessionStage, TaskTableName> = {
   topic_intake: 'topic_intake_task',
@@ -53,10 +69,12 @@ const STEP_TABLE_MAP: Record<SessionStage, StepTableName> = {
   summary: 'summary_step'
 };
 
+function contextKey(sessionId: string, stage: SessionStage): string {
+  return `${sessionId}:${stage}`;
+}
+
 export class TaskTracker {
-  private currentTaskId: string | null = null;
-  private currentTaskSessionId: string | null = null;
-  private currentTaskStage: SessionStage | null = null;
+  private readonly activeTasks = new Map<string, TaskContext>();
   private onTaskProgress: TaskProgressCallback | null = null;
 
   setProgressListener(callback: TaskProgressCallback): void {
@@ -74,16 +92,14 @@ export class TaskTracker {
       VALUES (?, ?, 'running', 0, ?, ?)
     `).run(taskId, sessionId, now, now);
 
-    this.currentTaskId = taskId;
-    this.currentTaskSessionId = sessionId;
-    this.currentTaskStage = stage;
-
-    this.onTaskProgress?.({
+    this.activeTasks.set(contextKey(sessionId, stage), { taskId, sessionId, stage });
+    this.emitProgress({
       sessionId,
       stage,
       taskId,
       status: 'running',
-      progress: 0
+      progress: 0,
+      updatedAt: now
     });
 
     return {
@@ -96,13 +112,13 @@ export class TaskTracker {
     };
   }
 
-  createStep(taskId: string | null, stage: SessionStage, name: string, data: Record<string, unknown> = {}): StepRecord | null {
-    const db = getDb();
-    const effectiveTaskId = taskId || this.currentTaskId;
-    if (!effectiveTaskId) {
+  createStep(sessionId: string, stage: SessionStage, name: string, data: Record<string, unknown> = {}): StepRecord | null {
+    const context = this.activeTasks.get(contextKey(sessionId, stage));
+    if (!context) {
       return null;
     }
 
+    const db = getDb();
     const stepId = crypto.randomUUID();
     const now = new Date().toISOString();
     const stepTable = STEP_TABLE_MAP[stage];
@@ -110,20 +126,23 @@ export class TaskTracker {
     db.prepare(`
       INSERT INTO ${stepTable} (id, task_id, name, data, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(stepId, effectiveTaskId, name, JSON.stringify(data), now, now);
+    `).run(stepId, context.taskId, name, JSON.stringify(data), now, now);
 
-    this.onTaskProgress?.({
-      sessionId: this.currentTaskSessionId ?? '',
-      stage: stage,
-      taskId: effectiveTaskId,
+    const progress = this.getProgressFromStepName(name);
+    this.updateTaskProgress(sessionId, stage, progress);
+    this.emitProgress({
+      sessionId,
+      stage,
+      taskId: context.taskId,
       status: 'running',
-      progress: this.currentTaskStage === stage ? this.getProgressFromStepName(name) : 0,
+      progress,
+      updatedAt: now,
       currentStep: { name, data }
     });
 
     return {
       id: stepId,
-      taskId: effectiveTaskId,
+      taskId: context.taskId,
       name,
       data: JSON.stringify(data),
       createdAt: now,
@@ -131,8 +150,9 @@ export class TaskTracker {
     };
   }
 
-  updateTaskProgress(stage: SessionStage, progress: number): void {
-    if (!this.currentTaskId || this.currentTaskStage !== stage) {
+  updateTaskProgress(sessionId: string, stage: SessionStage, progress: number): void {
+    const context = this.activeTasks.get(contextKey(sessionId, stage));
+    if (!context) {
       return;
     }
 
@@ -142,19 +162,26 @@ export class TaskTracker {
 
     db.prepare(`
       UPDATE ${taskTable} SET progress = ?, updated_at = ? WHERE id = ?
-    `).run(progress, now, this.currentTaskId);
+    `).run(progress, now, context.taskId);
 
-    this.onTaskProgress?.({
-      sessionId: this.currentTaskSessionId ?? '',
+    this.emitProgress({
+      sessionId,
       stage,
-      taskId: this.currentTaskId,
+      taskId: context.taskId,
       status: 'running',
-      progress
+      progress,
+      updatedAt: now
     });
   }
 
-  completeTask(stage: SessionStage, status: 'completed' | 'failed' = 'completed'): void {
-    if (!this.currentTaskId || this.currentTaskStage !== stage) {
+  completeTask(
+    sessionId: string,
+    stage: SessionStage,
+    status: Extract<StageRunStatus, 'completed' | 'failed'> = 'completed',
+    error?: string
+  ): void {
+    const context = this.activeTasks.get(contextKey(sessionId, stage));
+    if (!context) {
       return;
     }
 
@@ -164,26 +191,19 @@ export class TaskTracker {
 
     db.prepare(`
       UPDATE ${taskTable} SET status = ?, progress = 100, updated_at = ? WHERE id = ?
-    `).run(status, now, this.currentTaskId);
+    `).run(status, now, context.taskId);
 
-    this.onTaskProgress?.({
-      sessionId: this.currentTaskSessionId ?? '',
+    this.emitProgress({
+      sessionId,
       stage,
-      taskId: this.currentTaskId,
+      taskId: context.taskId,
       status,
-      progress: 100
+      progress: 100,
+      updatedAt: now,
+      ...(error ? { error } : {})
     });
 
-    this.currentTaskId = null;
-    this.currentTaskSessionId = null;
-    this.currentTaskStage = null;
-  }
-
-  private getProgressFromStepName(name: string): number {
-    if (name === 'completed') return 100;
-    if (name.startsWith('round_') && name.includes('completed')) return 90;
-    if (name.startsWith('round_') && name.includes('started')) return 20;
-    return 50;
+    this.activeTasks.delete(contextKey(sessionId, stage));
   }
 
   getTask(sessionId: string, stage: SessionStage): TaskRecord | null {
@@ -205,14 +225,23 @@ export class TaskTracker {
     const db = getDb();
     const stepTable = STEP_TABLE_MAP[stage];
 
-    const rows = db.prepare(`
+    return db.prepare(`
       SELECT id, task_id as taskId, name, data, created_at as createdAt, updated_at as updatedAt
       FROM ${stepTable}
       WHERE task_id = ?
       ORDER BY created_at ASC
     `).all(taskId) as StepRecord[];
+  }
 
-    return rows;
+  private emitProgress(event: TaskProgressPayload): void {
+    this.onTaskProgress?.(event);
+  }
+
+  private getProgressFromStepName(name: string): number {
+    if (name === 'completed') return 100;
+    if (name.startsWith('round_') && name.includes('completed')) return 90;
+    if (name.startsWith('round_') && name.includes('started')) return 20;
+    return 50;
   }
 }
 

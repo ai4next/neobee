@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CreateSessionInput, ResearchProgress, SessionAggregate, SessionStage } from '@neobee/shared';
+import type { CreateSessionInput, SessionAggregate, SessionEvent } from '@neobee/shared';
 import './styles/App.css';
 import './styles/Forms.css';
 import SessionList from './components/SessionList';
@@ -14,8 +14,7 @@ import IdeasCard from './components/stage-card/IdeasCard';
 import GraphBuildCard from './components/stage-card/GraphBuildCard';
 import SummaryCard from './components/stage-card/SummaryCard';
 import { ConfigSettings } from './components/ConfigSettings';
-
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:4001';
+import { useSessions } from './hooks/useSessions';
 
 const initialForm: CreateSessionInput = {
   topic: 'AI-native workflow ideas for solo founders',
@@ -25,240 +24,81 @@ const initialForm: CreateSessionInput = {
   language: 'en'
 };
 
+function formatEventLabel(event: SessionEvent): string {
+  return event.type.replace(/\./g, ' ');
+}
+
+function formatTimestamp(timestamp: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    day: 'numeric'
+  }).format(new Date(timestamp));
+}
+
 export default function App() {
   const { t, i18n } = useTranslation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [systemModalOpen, setSystemModalOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [form, setForm] = useState(initialForm);
-  const [sessions, setSessions] = useState<SessionAggregate[]>([]);
-  const [session, setSession] = useState<SessionAggregate | null>(null);
-  const [selectedStage, setSelectedStage] = useState<SessionStage>('topic_intake');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [taskProgress, setTaskProgress] = useState<Record<string, {
-    status: string;
-    progress: number;
-    steps: { name: string; data: Record<string, unknown> }[];
-  }>>({});
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
+  const {
+    sessions,
+    session,
+    events,
+    taskProgress,
+    selectedStage,
+    setSelectedStage,
+    isSubmitting,
+    error,
+    createAndRunSession,
+    selectSession,
+    prepareNewSession
+  } = useSessions(i18n.language);
 
   useEffect(() => {
-    fetchSessions();
-  }, []);
-
-  async function fetchSessions() {
-    try {
-      const res = await fetch('/api/sessions');
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch sessions:', err);
+    if (!session) {
+      setForm(initialForm);
+      return;
     }
+
+    setForm({
+      topic: session.session.topic,
+      roundCount: session.session.roundCount,
+      expertCount: session.session.expertCount,
+      additionalInfo: session.session.additionalInfo || '',
+      language: session.session.language || 'en'
+    });
+  }, [session]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await createAndRunSession({ ...form, language: i18n.language });
+  }
+
+  function handleNewSession() {
+    prepareNewSession();
+    setForm(initialForm);
+  }
+
+  function handleSelectSession(nextSession: SessionAggregate) {
+    selectSession(nextSession);
   }
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'en' ? 'zh' : 'en');
   };
 
-  const subscribeToSession = (sessionId: string) => {
-    const sendSubscribe = () => {
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'subscribe_session', payload: { sessionId } }));
-        return true;
-      }
-      return false;
-    };
-
-    if (sendSubscribe()) return;
-
-    reconnectAttempts.current = 0;
-    connectWebSocket();
-
-    const checkAndSubscribe = setInterval(() => {
-      if (sendSubscribe()) {
-        clearInterval(checkAndSubscribe);
-      }
-    }, 50);
-
-    setTimeout(() => clearInterval(checkAndSubscribe), 5000);
-  };
-
-  const connectWebSocket = () => {
-    const current = wsRef.current;
-    if (current && (current.readyState === WebSocket.OPEN || current.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
-
-    ws.onmessage = (message) => {
-      try {
-        const data = JSON.parse(message.data);
-        switch (data.type) {
-          case 'session_state': {
-            const aggregate = data.payload as SessionAggregate;
-            setSession(aggregate);
-            setSelectedStage(aggregate.session.currentStage || 'topic_intake');
-            setSessions((prev) => {
-              const exists = prev.some((s) => s.session.id === aggregate.session.id);
-              if (exists) {
-                return prev.map((s) => (s.session.id === aggregate.session.id ? aggregate : s));
-              }
-              return [aggregate, ...prev];
-            });
-            break;
-          }
-          case 'session_completed': {
-            const aggregate = data.payload as SessionAggregate;
-            setSession(aggregate);
-            setSessions((prev) => prev.map((s) => (s.session.id === aggregate.session.id ? aggregate : s)));
-            setIsSubmitting(false);
-            break;
-          }
-          case 'event': {
-            const event = data.payload as { stage: string; type: string; progress?: ResearchProgress };
-            setSession((prev) => {
-              if (!prev) return prev;
-              const updated = {
-                ...prev,
-                session: {
-                  ...prev.session,
-                  currentStage: event.stage as any
-                }
-              };
-              if (event.type === 'research.progress' && event.progress) {
-                updated.researchProgress = [...(prev.researchProgress || []), event.progress];
-              }
-              return updated;
-            });
-            // Auto-switch to the stage from the event
-            if (event.stage) {
-              setSelectedStage(event.stage as SessionStage);
-            }
-            break;
-          }
-          case 'task.progress': {
-            const progress = data.payload as {
-              stage: string;
-              taskId: string;
-              status: string;
-              progress: number;
-              currentStep?: { name: string; data: Record<string, unknown> };
-            };
-            setTaskProgress((prev) => {
-              const existing = prev[progress.stage];
-              const newStep = progress.currentStep ? { name: progress.currentStep.name, data: progress.currentStep.data } : null;
-              return {
-                ...prev,
-                [progress.stage]: {
-                  status: progress.status,
-                  progress: progress.progress,
-                  steps: newStep && !existing?.steps.some(s => s.name === newStep.name)
-                    ? [...(existing?.steps || []), newStep]
-                    : (existing?.steps || [])
-                }
-              };
-            });
-            break;
-          }
-          case 'error': {
-            setError(data.payload.message);
-            setIsSubmitting(false);
-            break;
-          }
-        }
-      } catch {
-        console.warn('Failed to parse WebSocket message');
-      }
-    };
-
-    ws.onerror = () => {
-      setError('WebSocket connection error');
-    };
-
-    ws.onclose = () => {
-      wsRef.current = null;
-      // Reconnection logic with exponential backoff
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-        reconnectAttempts.current++;
-        setTimeout(() => {
-          connectWebSocket();
-        }, delay);
-      }
-    };
-  };
-
-  useEffect(() => {
-    return () => {
-      wsRef.current?.close();
-    };
-  }, []);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, language: i18n.language })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to create session');
-      }
-
-      const aggregate = await res.json() as SessionAggregate;
-      setSession(aggregate);
-      setSessions((prev) => [aggregate, ...prev]);
-
-      // Subscribe for live updates in parallel; workflow start stays on HTTP.
-      void subscribeToSession(aggregate.session.id);
-
-      const runRes = await fetch(`/api/sessions/${aggregate.session.id}/run`, {
-        method: 'POST'
-      });
-      if (!runRes.ok) {
-        const err = await runRes.json();
-        throw new Error(err.error || 'Failed to start session');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setIsSubmitting(false);
-    }
-  }
-
-  function handleNewSession() {
-    setSession(null);
-    setError(null);
-    setForm(initialForm);
-    setSelectedStage('topic_intake');
-  }
-
-  function handleSelectSession(selectedSession: SessionAggregate) {
-    setSession(selectedSession);
-    setSelectedStage(selectedSession.session.currentStage || 'topic_intake');
-    setForm({
-      topic: selectedSession.session.topic,
-      roundCount: selectedSession.session.roundCount,
-      expertCount: selectedSession.session.expertCount,
-      additionalInfo: selectedSession.session.additionalInfo || '',
-      language: selectedSession.session.language || 'en'
-    });
-
-    void subscribeToSession(selectedSession.session.id);
-  }
+  const activeEventFeed = [...events].slice(-8).reverse();
+  const stageStats = session
+    ? [
+        { label: t('signals'), value: session.researchBrief?.signals.length ?? 0 },
+        { label: t('experts'), value: session.experts.length },
+        { label: t('ideas'), value: session.ideas.length },
+        { label: t('events'), value: events.length }
+      ]
+    : [];
 
   return (
     <main className={`neobee-shell${darkMode ? ' dark' : ''}`}>
@@ -280,26 +120,92 @@ export default function App() {
             taskProgress={taskProgress}
           />
 
-          <div className="nb-workbench">
-            {selectedStage === 'topic_intake' && (
-              <TopicIntakeCard
-                session={session}
-                form={form}
-                onFormChange={setForm}
-                onSubmit={handleSubmit}
-                isSubmitting={isSubmitting}
-                error={error}
-                onNewSession={handleNewSession}
-              />
-            )}
+          {session && (
+            <section className="nb-session-overview">
+              <div className="nb-overview-hero">
+                <span className="nb-overview-label">{t('currentPhase')}</span>
+                <h2>{session.session.topic}</h2>
+                <p>
+                  {t(session.session.currentStage ?? 'topic_intake')} • {session.session.status}
+                </p>
+              </div>
+              <div className="nb-overview-stats">
+                {stageStats.map((item) => (
+                  <div key={item.label} className="nb-overview-stat">
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
-            {selectedStage === 'deep_research' && <ResearchCard session={session} taskProgress={taskProgress.deep_research} />}
-            {selectedStage === 'expert_creation' && <ExpertsCard session={session} taskProgress={taskProgress.expert_creation} />}
-            {selectedStage === 'insight_refinement' && <InsightRefinementCard session={session} taskProgress={taskProgress.insight_refinement} />}
-            {selectedStage === 'cross_review' && <CrossReviewCard session={session} taskProgress={taskProgress.cross_review} />}
-            {selectedStage === 'idea_synthesis' && <IdeasCard session={session} taskProgress={taskProgress.idea_synthesis} />}
-            {selectedStage === 'graph_build' && <GraphBuildCard session={session} taskProgress={taskProgress.graph_build} />}
-            {selectedStage === 'summary' && <SummaryCard session={session} taskProgress={taskProgress.summary} />}
+          <div className="nb-workbench-grid">
+            <div className="nb-workbench">
+              {selectedStage === 'topic_intake' && (
+                <TopicIntakeCard
+                  session={session}
+                  form={form}
+                  onFormChange={setForm}
+                  onSubmit={handleSubmit}
+                  isSubmitting={isSubmitting}
+                  error={error}
+                  onNewSession={handleNewSession}
+                />
+              )}
+
+              {selectedStage === 'deep_research' && <ResearchCard session={session} taskProgress={taskProgress.deep_research} />}
+              {selectedStage === 'expert_creation' && <ExpertsCard session={session} taskProgress={taskProgress.expert_creation} />}
+              {selectedStage === 'insight_refinement' && <InsightRefinementCard session={session} taskProgress={taskProgress.insight_refinement} />}
+              {selectedStage === 'cross_review' && <CrossReviewCard session={session} taskProgress={taskProgress.cross_review} />}
+              {selectedStage === 'idea_synthesis' && <IdeasCard session={session} taskProgress={taskProgress.idea_synthesis} />}
+              {selectedStage === 'graph_build' && <GraphBuildCard session={session} taskProgress={taskProgress.graph_build} />}
+              {selectedStage === 'summary' && <SummaryCard session={session} taskProgress={taskProgress.summary} />}
+            </div>
+
+            <aside className="nb-activity-rail">
+              <article className="nb-stage-card mini">
+                <div className="nb-card-header compact">
+                  <div>
+                    <div className="nb-card-code">{t('runtimeLog')}</div>
+                    <h2>{t('events')}</h2>
+                  </div>
+                  <span className="nb-card-side">{events.length}</span>
+                </div>
+                {activeEventFeed.length > 0 ? (
+                  <div className="nb-event-feed">
+                    {activeEventFeed.map((eventItem) => (
+                      <div key={eventItem.id} className="nb-event-row">
+                        <div className="nb-event-meta">
+                          <span>{t(eventItem.stage)}</span>
+                          <span>{formatTimestamp(eventItem.timestamp)}</span>
+                        </div>
+                        <strong>{formatEventLabel(eventItem)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="nb-empty">{t('noEvents')}</div>
+                )}
+              </article>
+
+              <article className="nb-stage-card mini">
+                <div className="nb-card-header compact">
+                  <div>
+                    <div className="nb-card-code">{t('selectedStage')}</div>
+                    <h2>{t(selectedStage)}</h2>
+                  </div>
+                </div>
+                <div className="nb-stage-guidance">
+                  <p>{t('stageGuideIntro')}</p>
+                  <div className="nb-stage-guidance-metrics">
+                    <span>{t('statusLabel')}: {taskProgress[selectedStage]?.status ?? session?.session.status ?? t('pending')}</span>
+                    <span>{t('progress')}: {taskProgress[selectedStage]?.progress ?? 0}%</span>
+                  </div>
+                </div>
+                {error && <div className="nb-error wide">{error}</div>}
+              </article>
+            </aside>
           </div>
         </div>
       </section>

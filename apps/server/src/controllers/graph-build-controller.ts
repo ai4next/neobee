@@ -27,7 +27,7 @@ export class GraphBuildController extends StageController {
     });
 
     this.store.setGraph(session.id, graph);
-    this.completeTask();
+    this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'graph.updated', 'graph_build', { graph });
     this.advance(session.id, 'summary');
   }

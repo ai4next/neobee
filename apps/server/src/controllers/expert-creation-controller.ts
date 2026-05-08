@@ -21,7 +21,7 @@ export class ExpertCreationController extends StageController {
     const experts = await chain.run(session, aggregate.researchBrief);
 
     this.store.setExperts(session.id, experts);
-    this.completeTask();
+    this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'experts.generated', 'expert_creation', { experts });
     this.advance(session.id, 'insight_refinement');
   }

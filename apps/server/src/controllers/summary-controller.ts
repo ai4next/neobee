@@ -20,7 +20,7 @@ export class SummaryController extends StageController {
     const summary = await chain.run(aggregate);
 
     this.store.setSummary(session.id, summary);
-    this.completeTask();
+    this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'summary.completed', 'summary', { summary });
 
     // Mark session as completed
