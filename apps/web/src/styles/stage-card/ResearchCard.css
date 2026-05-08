@@ -1,0 +1,108 @@
+/* ============================
+   Research Card
+   ============================ */
+
+.nb-research-progress {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 12px;
+  border: 1px solid var(--line, #e0e0e0);
+}
+
+.nb-research-progress h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: var(--muted, #666);
+}
+
+.nb-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nb-progress-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg, white);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.nb-progress-stage {
+  font-weight: 600;
+  color: var(--accent, #0066cc);
+  min-width: 140px;
+}
+
+.nb-progress-message {
+  color: var(--text, #333);
+}
+
+.nb-progress-spinner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--muted, #666);
+}
+
+.nb-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line, #e0e0e0);
+  border-top-color: var(--accent, #0066cc);
+  border-radius: 50%;
+  animation: nb-spin 0.8s linear infinite;
+}
+
+@keyframes nb-spin {
+  to { transform: rotate(360deg); }
+}
+
+.nb-expert-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.nb-expert-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 14px;
+  will-change: transform;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.nb-expert-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.nb-expert-domain {
+  color: var(--accent);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.nb-expert-name {
+  margin: 6px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.nb-expert-stance {
+  color: var(--muted);
+}
+
+.nb-metric-block ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}

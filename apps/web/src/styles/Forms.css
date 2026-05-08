@@ -1,0 +1,237 @@
+/* ============================
+   Form Styles (shared across components)
+   ============================ */
+
+.nb-intake-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.nb-intake-form.centered {
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 18px auto 0;
+  gap: 14px;
+}
+
+/* ChatGPT-style input area */
+.nb-chat-style {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+}
+
+.nb-chat-style .nb-card-header {
+  flex-shrink: 0;
+}
+
+.nb-intro-content {
+  flex-shrink: 0;
+  margin: 12px 0 16px;
+}
+
+.nb-chat-input-area {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.nb-chat-form {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.nb-textarea-wrapper {
+  padding: 14px 14px 0;
+}
+
+.nb-textarea-wrapper textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  resize: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink);
+  padding: 0;
+}
+
+.nb-textarea-wrapper textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.nb-textarea-wrapper textarea::placeholder {
+  color: var(--muted);
+}
+
+.nb-chat-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px 14px;
+  gap: 12px;
+}
+
+.nb-submit-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.nb-send-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+}
+
+.nb-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nb-loading::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ============================
+   Form Fields
+   ============================ */
+
+.nb-field {
+  display: grid;
+  gap: 8px;
+}
+
+.nb-field.wide,
+.nb-form-actions.wide,
+.nb-error.wide {
+  grid-column: 1 / -1;
+}
+
+.nb-field span {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.nb-field input,
+.nb-field textarea {
+  width: 100%;
+  border-radius: 10px;
+  padding: 12px 14px;
+  will-change: border-color, box-shadow;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.nb-field input:focus,
+.nb-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.nb-form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ============================
+   Buttons
+   ============================ */
+
+.nb-primary-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 20px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  will-change: transform, opacity, box-shadow;
+  transition: all var(--transition-fast);
+}
+
+.nb-primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+  background: var(--accent-hover);
+}
+
+.nb-primary-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.nb-primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nb-back-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nb-back-btn:hover {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================
+   Utility
+   ============================ */
+
+.nb-inline-note,
+.nb-api-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.nb-error {
+  color: var(--risk);
+  font-weight: 500;
+}
+
+.nb-round-chip {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+@media (max-width: 1200px) {
+  .nb-intake-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .nb-intake-form {
+    grid-template-columns: 1fr;
+  }
+}

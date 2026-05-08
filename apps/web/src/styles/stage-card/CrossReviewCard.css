@@ -1,0 +1,70 @@
+.nb-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nb-review-item {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.nb-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.nb-review-expert {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.nb-review-objection {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.nb-review-objection.objection-low {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--support);
+}
+
+.nb-review-objection.objection-medium {
+  background: rgba(251, 191, 36, 0.1);
+  color: #f59e0b;
+}
+
+.nb-review-objection.objection-high {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--risk);
+}
+
+.nb-review-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.nb-review-scores span {
+  padding: 2px 6px;
+  background: var(--panel);
+  border-radius: 4px;
+}
+
+.nb-review-comment {
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.5;
+}

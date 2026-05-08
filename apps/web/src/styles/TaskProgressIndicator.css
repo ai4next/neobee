@@ -1,0 +1,95 @@
+.nb-task-progress-indicator {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.nb-task-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.nb-task-progress-stage {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nb-task-progress-pct {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.nb-task-progress-bar {
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.nb-task-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.nb-task-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nb-task-step-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.nb-task-step-msg {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.nb-steps-pagination {
+  margin-top: 8px;
+}
+
+.nb-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.nb-pagination-controls button {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.nb-pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nb-pagination-controls span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}

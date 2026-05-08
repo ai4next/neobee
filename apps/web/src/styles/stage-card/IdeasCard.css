@@ -1,0 +1,34 @@
+/* ============================
+   Ideas Card
+   ============================ */
+
+.nb-idea-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 14px;
+  will-change: transform;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.nb-idea-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.nb-idea-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.nb-idea-title-row h3 {
+  margin: 6px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.nb-idea-meta {
+  color: var(--muted);
+}

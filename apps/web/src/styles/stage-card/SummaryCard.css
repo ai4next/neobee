@@ -1,0 +1,98 @@
+/* ============================
+   Summary Card
+   ============================ */
+
+.nb-hero-title {
+  margin: 6px 0 0;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.nb-hero-badge {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.nb-hero-copy,
+.nb-rich-copy {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.nb-score-pill {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.nb-badge {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.nb-badge.processing {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+}
+
+.nb-badge.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--support);
+}
+
+.nb-badge.pending {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.nb-empty {
+  color: var(--muted);
+}
+
+/* System Card */
+.nb-system-card {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.nb-system-card .nb-card-side,
+.nb-system-card .nb-api-note,
+.nb-system-card .nb-log-line,
+.nb-system-card .nb-empty {
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.nb-log-panel {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  margin-top: 12px;
+}
+
+.nb-log-line {
+  display: grid;
+  grid-template-columns: 90px 150px 1fr;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.nb-log-time,
+.nb-log-stage {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}

@@ -1,0 +1,348 @@
+/* ============================
+   Config Settings Panel
+   ============================ */
+
+.nb-config-panel {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.nb-config-expandable {
+  margin-bottom: 12px;
+}
+
+.nb-config-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nb-config-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.nb-config-toggle svg:first-child {
+  color: var(--accent);
+}
+
+.nb-chevron {
+  margin-left: auto;
+  transition: transform var(--transition-fast);
+}
+
+.nb-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.nb-config-message {
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+}
+
+.nb-config-message.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--support);
+}
+
+.nb-config-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--risk);
+}
+
+.nb-config-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nb-config-provider {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.nb-provider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+.nb-provider-select {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.nb-provider-enabled {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.nb-provider-enabled input {
+  width: 14px;
+  height: 14px;
+}
+
+.nb-provider-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nb-provider-fields .nb-field {
+  margin: 0;
+}
+
+.nb-provider-fields .nb-field span {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.nb-provider-fields input,
+.nb-provider-fields select {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.nb-model-select {
+  width: 100%;
+}
+
+.nb-config-default {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.nb-config-default .nb-field {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nb-config-default .nb-field span {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.nb-config-default select {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+/* ============================
+   Settings Detail Panel
+   ============================ */
+
+.nb-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.nb-config-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.nb-config-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.nb-config-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nb-config-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.nb-config-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.nb-config-btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.nb-config-btn.danger {
+  color: var(--risk);
+  border-color: var(--risk);
+}
+
+.nb-config-btn.danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.nb-config-btn:disabled,
+.nb-config-btn.small {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.nb-config-btn.add {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  background: var(--bg);
+}
+
+.nb-detail-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nb-detail-back:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.nb-detail-content {
+  padding: 4px 0;
+}
+
+.nb-settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nb-settings-label {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+/* ============================
+   Toggle Switch
+   ============================ */
+
+.nb-toggle {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.nb-toggle-option {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nb-toggle-option.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.nb-toggle-option:not(.active):hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ============================
+   Lang Switch
+   ============================ */
+
+.nb-lang-switch {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nb-lang-switch:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ============================
+   Animations
+   ============================ */
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
