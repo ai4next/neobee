@@ -41,9 +41,9 @@ export default function TopicIntakeCard({
             <input
               type="number"
               min={1}
-              max={10000}
+              max={1000}
               value={form.roundCount}
-              onChange={(e) => onFormChange({ ...form, roundCount: Math.max(1, Math.min(10000, Number(e.target.value))) })}
+              onChange={(e) => onFormChange({ ...form, roundCount: Math.max(1, Math.min(1000, Number(e.target.value))) })}
             />
           </label>
           <label className="nb-field">
@@ -51,9 +51,9 @@ export default function TopicIntakeCard({
             <input
               type="number"
               min={1}
-              max={10000}
+              max={1000}
               value={form.expertCount}
-              onChange={(e) => onFormChange({ ...form, expertCount: Math.max(1, Math.min(10000, Number(e.target.value))) })}
+              onChange={(e) => onFormChange({ ...form, expertCount: Math.max(1, Math.min(1000, Number(e.target.value))) })}
             />
           </label>
           <label className="nb-field">

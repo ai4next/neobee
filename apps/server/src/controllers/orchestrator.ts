@@ -7,8 +7,6 @@ import { ExpertCreationController } from './expert-creation-controller.js';
 import { InsightRefinementController } from './insight-refinement-controller.js';
 import { CrossReviewController } from './cross-review-controller.js';
 import { IdeaSynthesisController } from './idea-synthesis-controller.js';
-import { GraphBuildController } from './graph-build-controller.js';
-import { SummaryController } from './summary-controller.js';
 
 export class StageOrchestrator {
   private readonly controllers: Map<SessionStage, StageController> = new Map();
@@ -19,9 +17,7 @@ export class StageOrchestrator {
       'expert_creation',
       'insight_refinement',
       'cross_review',
-      'idea_synthesis',
-      'graph_build',
-      'summary'
+      'idea_synthesis'
     ];
 
     for (const stage of stages) {
@@ -42,10 +38,6 @@ export class StageOrchestrator {
         return new CrossReviewController(store, eventBus, stage);
       case 'idea_synthesis':
         return new IdeaSynthesisController(store, eventBus, stage);
-      case 'graph_build':
-        return new GraphBuildController(store, eventBus, stage);
-      case 'summary':
-        return new SummaryController(store, eventBus, stage);
       default:
         throw new Error(`Unknown stage: ${stage}`);
     }

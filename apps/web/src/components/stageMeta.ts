@@ -6,7 +6,5 @@ export const stageMeta: Array<{ stage: SessionStage; code: string }> = [
   { stage: 'expert_creation', code: '02' },
   { stage: 'insight_refinement', code: '03' },
   { stage: 'cross_review', code: '04' },
-  { stage: 'idea_synthesis', code: '05' },
-  { stage: 'graph_build', code: '06' },
-  { stage: 'summary', code: '07' }
+  { stage: 'idea_synthesis', code: '05' }
 ];

@@ -21,7 +21,7 @@
 
 ## 设计文档
 
-- [架构与产品设计优化计划](./docs/architecture-redesign-plan.md)
+- [系统架构](./docs/ARCHITECTURE.md)
 
 ## 技术栈
 

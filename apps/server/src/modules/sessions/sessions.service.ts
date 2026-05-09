@@ -1,4 +1,4 @@
-import type { CreateSessionInput, SessionAggregate, SessionCheckpoint, SessionEvent, SessionStage } from '@neobee/shared';
+import type { CreateSessionInput, SessionAggregate, SessionCheckpoint, SessionEvent, SessionStage, SessionStatus } from '@neobee/shared';
 import { SessionStore } from './sessions.store.js';
 import { EventBus } from '../../lib/event-bus.js';
 import { taskTracker } from '../../lib/task-tracking.js';
@@ -51,6 +51,34 @@ export class SessionsService {
     this.store.appendError(sessionId, 'Session cancelled');
     this.eventBus.emitRaw(sessionId, 'run.failed', stage, { error: 'Session cancelled' });
     return this.requireSession(sessionId);
+  }
+
+  retrySession(sessionId: string): SessionAggregate {
+    const aggregate = this.requireSession(sessionId);
+
+    if (aggregate.session.status !== 'failed') {
+      throw new Error('只能重试已失败的会话');
+    }
+
+    const failedStage = aggregate.session.currentStage;
+    if (!failedStage) {
+      throw new Error('未找到失败的阶段');
+    }
+
+    this.store.clearStageData(sessionId, failedStage);
+    this.store.clearErrors(sessionId);
+
+    const status = this.stageToStatus(failedStage);
+    this.store.setStatus(sessionId, status as SessionStatus, failedStage);
+
+    this.eventBus.emitRaw(sessionId, 'task.started', failedStage, { sessionId, stage: failedStage });
+
+    return this.requireSession(sessionId);
+  }
+
+  deleteSession(sessionId: string): void {
+    this.requireSession(sessionId);
+    this.store.delete(sessionId);
   }
 
   listSessions(): SessionAggregate[] {
@@ -119,9 +147,7 @@ export class SessionsService {
       expert_creation: 'experts_generated',
       insight_refinement: 'debating',
       cross_review: 'reviewing',
-      idea_synthesis: 'synthesizing',
-      graph_build: 'synthesizing',
-      summary: 'completed'
+      idea_synthesis: 'synthesizing'
     };
     return map[stage] ?? 'created';
   }

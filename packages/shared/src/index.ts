@@ -15,9 +15,7 @@ export type SessionStage =
   | 'expert_creation'
   | 'insight_refinement'
   | 'cross_review'
-  | 'idea_synthesis'
-  | 'graph_build'
-  | 'summary';
+  | 'idea_synthesis';
 
 export type StageRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
 
@@ -51,7 +49,8 @@ export type GraphEdgeType =
   | 'reframes'
   | 'flags_risk'
   | 'contributes_to'
-  | 'reviewed';
+  | 'reviewed'
+  | 'about';
 
 export interface CreateSessionInput {
   topic: string;
@@ -200,10 +199,6 @@ export type SessionEventType =
   | 'review.completed'
   | 'idea_synthesis.started'
   | 'idea.generated'
-  | 'graph_build.started'
-  | 'graph.updated'
-  | 'summary.started'
-  | 'summary.completed'
   | 'round.started'
   | 'insight.created'
   | 'round.completed'

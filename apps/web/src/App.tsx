@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CreateSessionInput, SessionAggregate, SessionEvent } from '@neobee/shared';
+import type { CreateSessionInput, SessionAggregate } from '@neobee/shared';
 import './styles/App.css';
 import './styles/Forms.css';
 import SessionList from './components/SessionList';
@@ -11,8 +11,6 @@ import ExpertsCard from './components/stage-card/ExpertsCard';
 import InsightRefinementCard from './components/stage-card/InsightRefinementCard';
 import CrossReviewCard from './components/stage-card/CrossReviewCard';
 import IdeasCard from './components/stage-card/IdeasCard';
-import GraphBuildCard from './components/stage-card/GraphBuildCard';
-import SummaryCard from './components/stage-card/SummaryCard';
 import { ConfigSettings } from './components/ConfigSettings';
 import { useSessions } from './hooks/useSessions';
 
@@ -23,19 +21,6 @@ const initialForm: CreateSessionInput = {
   additionalInfo: '',
   language: 'en'
 };
-
-function formatEventLabel(event: SessionEvent): string {
-  return event.type.replace(/\./g, ' ');
-}
-
-function formatTimestamp(timestamp: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'short',
-    day: 'numeric'
-  }).format(new Date(timestamp));
-}
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -53,6 +38,8 @@ export default function App() {
     isSubmitting,
     error,
     createAndRunSession,
+    retrySession,
+    deleteSession,
     selectSession,
     prepareNewSession
   } = useSessions(i18n.language);
@@ -90,7 +77,6 @@ export default function App() {
     i18n.changeLanguage(i18n.language === 'en' ? 'zh' : 'en');
   };
 
-  const activeEventFeed = [...events].slice(-8).reverse();
   const stageStats = session
     ? [
         { label: t('signals'), value: session.researchBrief?.signals.length ?? 0 },
@@ -109,26 +95,20 @@ export default function App() {
             currentSession={session}
             onSelectSession={handleSelectSession}
             onNewSession={handleNewSession}
+            onDeleteSession={deleteSession}
           />
         </div>
 
         <div className="nb-panel right">
-          <StageNavBar
-            session={session}
-            selectedStage={selectedStage}
-            onSelectStage={setSelectedStage}
-            taskProgress={taskProgress}
-          />
+          <div className="nb-stage-header">
+            <StageNavBar
+              session={session}
+              selectedStage={selectedStage}
+              onSelectStage={setSelectedStage}
+              taskProgress={taskProgress}
+            />
 
-          {session && (
-            <section className="nb-session-overview">
-              <div className="nb-overview-hero">
-                <span className="nb-overview-label">{t('currentPhase')}</span>
-                <h2>{session.session.topic}</h2>
-                <p>
-                  {t(session.session.currentStage ?? 'topic_intake')} • {session.session.status}
-                </p>
-              </div>
+            {session && (
               <div className="nb-overview-stats">
                 {stageStats.map((item) => (
                   <div key={item.label} className="nb-overview-stat">
@@ -137,11 +117,19 @@ export default function App() {
                   </div>
                 ))}
               </div>
-            </section>
-          )}
+            )}
+          </div>
 
           <div className="nb-workbench-grid">
             <div className="nb-workbench">
+              {session?.session.status === 'failed' && (
+                <div className="nb-retry-banner">
+                  <span className="nb-retry-message">{t('stageFailed') || 'Stage failed, click to retry'}</span>
+                  <button className="nb-retry-btn" onClick={retrySession} disabled={isSubmitting}>
+                    {isSubmitting ? t('running') : (t('retry') || 'Retry')}
+                  </button>
+                </div>
+              )}
               {selectedStage === 'topic_intake' && (
                 <TopicIntakeCard
                   session={session}
@@ -159,53 +147,7 @@ export default function App() {
               {selectedStage === 'insight_refinement' && <InsightRefinementCard session={session} taskProgress={taskProgress.insight_refinement} />}
               {selectedStage === 'cross_review' && <CrossReviewCard session={session} taskProgress={taskProgress.cross_review} />}
               {selectedStage === 'idea_synthesis' && <IdeasCard session={session} taskProgress={taskProgress.idea_synthesis} />}
-              {selectedStage === 'graph_build' && <GraphBuildCard session={session} taskProgress={taskProgress.graph_build} />}
-              {selectedStage === 'summary' && <SummaryCard session={session} taskProgress={taskProgress.summary} />}
             </div>
-
-            <aside className="nb-activity-rail">
-              <article className="nb-stage-card mini">
-                <div className="nb-card-header compact">
-                  <div>
-                    <div className="nb-card-code">{t('runtimeLog')}</div>
-                    <h2>{t('events')}</h2>
-                  </div>
-                  <span className="nb-card-side">{events.length}</span>
-                </div>
-                {activeEventFeed.length > 0 ? (
-                  <div className="nb-event-feed">
-                    {activeEventFeed.map((eventItem) => (
-                      <div key={eventItem.id} className="nb-event-row">
-                        <div className="nb-event-meta">
-                          <span>{t(eventItem.stage)}</span>
-                          <span>{formatTimestamp(eventItem.timestamp)}</span>
-                        </div>
-                        <strong>{formatEventLabel(eventItem)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="nb-empty">{t('noEvents')}</div>
-                )}
-              </article>
-
-              <article className="nb-stage-card mini">
-                <div className="nb-card-header compact">
-                  <div>
-                    <div className="nb-card-code">{t('selectedStage')}</div>
-                    <h2>{t(selectedStage)}</h2>
-                  </div>
-                </div>
-                <div className="nb-stage-guidance">
-                  <p>{t('stageGuideIntro')}</p>
-                  <div className="nb-stage-guidance-metrics">
-                    <span>{t('statusLabel')}: {taskProgress[selectedStage]?.status ?? session?.session.status ?? t('pending')}</span>
-                    <span>{t('progress')}: {taskProgress[selectedStage]?.progress ?? 0}%</span>
-                  </div>
-                </div>
-                {error && <div className="nb-error wide">{error}</div>}
-              </article>
-            </aside>
           </div>
         </div>
       </section>

@@ -33,6 +33,4 @@ function initSchema(database: BetterSqlite3.Database): void {
   database.exec(readSqlFile('insight-refinement.sql'));
   database.exec(readSqlFile('cross-review.sql'));
   database.exec(readSqlFile('idea-synthesis.sql'));
-  database.exec(readSqlFile('graph-build.sql'));
-  database.exec(readSqlFile('summary.sql'));
 }

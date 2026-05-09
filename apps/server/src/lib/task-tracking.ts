@@ -27,9 +27,7 @@ type TaskTableName =
   | 'expert_creation_task'
   | 'insight_refinement_task'
   | 'cross_review_task'
-  | 'idea_synthesis_task'
-  | 'graph_build_task'
-  | 'summary_task';
+  | 'idea_synthesis_task';
 
 type StepTableName =
   | 'topic_intake_step'
@@ -37,9 +35,7 @@ type StepTableName =
   | 'expert_creation_step'
   | 'insight_refinement_step'
   | 'cross_review_step'
-  | 'idea_synthesis_step'
-  | 'graph_build_step'
-  | 'summary_step';
+  | 'idea_synthesis_step';
 
 interface TaskContext {
   taskId: string;
@@ -53,9 +49,7 @@ const TASK_TABLE_MAP: Record<SessionStage, TaskTableName> = {
   expert_creation: 'expert_creation_task',
   insight_refinement: 'insight_refinement_task',
   cross_review: 'cross_review_task',
-  idea_synthesis: 'idea_synthesis_task',
-  graph_build: 'graph_build_task',
-  summary: 'summary_task'
+  idea_synthesis: 'idea_synthesis_task'
 };
 
 const STEP_TABLE_MAP: Record<SessionStage, StepTableName> = {
@@ -64,9 +58,7 @@ const STEP_TABLE_MAP: Record<SessionStage, StepTableName> = {
   expert_creation: 'expert_creation_step',
   insight_refinement: 'insight_refinement_step',
   cross_review: 'cross_review_step',
-  idea_synthesis: 'idea_synthesis_step',
-  graph_build: 'graph_build_step',
-  summary: 'summary_step'
+  idea_synthesis: 'idea_synthesis_step'
 };
 
 function contextKey(sessionId: string, stage: SessionStage): string {

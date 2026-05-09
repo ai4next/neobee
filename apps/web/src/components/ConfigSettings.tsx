@@ -21,9 +21,7 @@ const STAGES = [
   { id: 'expert_creation', name: 'Expert Synthesis' },
   { id: 'insight_refinement', name: 'Insight Refinement' },
   { id: 'cross_review', name: 'Cross Review' },
-  { id: 'idea_synthesis', name: 'Idea Synthesis' },
-  { id: 'graph_build', name: 'Graph Build' },
-  { id: 'summary', name: 'Summary' }
+  { id: 'idea_synthesis', name: 'Idea Synthesis' }
 ];
 
 const PROVIDER_OPTIONS = [

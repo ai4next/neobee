@@ -3,7 +3,7 @@ import { EventBus } from '../lib/event-bus.js';
 import { SessionStore } from '../modules/sessions/sessions.store.js';
 import { taskTracker } from '../lib/task-tracking.js';
 
-const STAGE_INTERVAL_MS = 500;
+const STAGE_INTERVAL_MS = 1000;
 
 export abstract class StageController {
   protected readonly store: SessionStore;
@@ -74,9 +74,7 @@ export abstract class StageController {
       expert_creation: 'experts_generated',
       insight_refinement: 'debating',
       cross_review: 'reviewing',
-      idea_synthesis: 'synthesizing',
-      graph_build: 'synthesizing',
-      summary: 'completed'
+      idea_synthesis: 'synthesizing'
     };
     return map[stage] ?? 'created';
   }
@@ -93,7 +91,7 @@ export abstract class StageController {
     taskTracker.updateTaskProgress(sessionId, this.stage, progress);
   }
 
-  protected completeTask(sessionId: string): void {
-    taskTracker.completeTask(sessionId, this.stage);
+  protected completeTask(sessionId: string, status: 'completed' | 'failed' = 'completed', error?: string): void {
+    taskTracker.completeTask(sessionId, this.stage, status, error);
   }
 }

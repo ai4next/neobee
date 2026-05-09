@@ -13,26 +13,23 @@
 
 .nb-stage-nav-bar-track {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   overflow-x: auto;
-  gap: 10px;
+  gap: 8px;
 }
 
 .nb-stage-nav-bar-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: start;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--panel-strong);
+  gap: 8px;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all var(--transition-fast);
   text-align: left;
   min-width: 0;
+  padding: 10px 12px;
 }
 
 .nb-stage-nav-bar-item:hover {
@@ -56,6 +53,7 @@
   color: var(--accent);
 }
 
+.nb-stage-nav-bar-item.selected.completed,
 .nb-stage-nav-bar-item.selected.active {
   color: white;
 }
@@ -105,13 +103,19 @@
   50% { opacity: 0.4; }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
+  .nb-stage-nav-bar-track {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
   .nb-stage-nav-bar-track {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .nb-stage-nav-bar-track {
     grid-template-columns: 1fr;
   }

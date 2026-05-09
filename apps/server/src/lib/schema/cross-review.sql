@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS cross_review_data (
   objection_level TEXT NOT NULL DEFAULT 'medium',
   FOREIGN KEY (session_id) REFERENCES session(id)
 );
-
 CREATE TABLE IF NOT EXISTS cross_review_task (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,

@@ -15,9 +15,7 @@ const STAGE_LABELS: Record<string, string> = {
   expert_creation: 'Creating Experts',
   insight_refinement: 'Insight Refinement',
   cross_review: 'Cross Review',
-  idea_synthesis: 'Idea Synthesis',
-  graph_build: 'Building Graph',
-  summary: 'Generating Summary'
+  idea_synthesis: 'Idea Synthesis'
 };
 
 export default function TaskProgressIndicator({ taskProgress, stage }: TaskProgressIndicatorProps) {

@@ -19,11 +19,15 @@ export class CrossReviewController extends StageController {
 
     const chain = new CrossReviewChain();
     const allInsights = aggregate.rounds.flatMap((r) => r.insights);
-    const reviews = await chain.run(aggregate.experts, allInsights);
+    const { reviews, insightTotals } = await chain.run(aggregate.experts, allInsights);
 
     this.store.setReviews(session.id, reviews);
+    this.createStep(session.id, 'aggregation_completed', { insightTotals });
     this.completeTask(session.id);
-    this.eventBus.emitRaw(session.id, 'review.completed', 'cross_review', { reviews });
+    this.eventBus.emitRaw(session.id, 'review.completed', 'cross_review', {
+      reviews,
+      insightTotals
+    });
     this.advance(session.id, 'idea_synthesis');
   }
 }

@@ -1,6 +1,5 @@
 import type {
   CreateSessionInput,
-  GraphData,
   IdeaCandidate,
   ResearchBrief,
   ReviewScore,
@@ -11,7 +10,6 @@ import type {
   SessionRound,
   SessionStage,
   SessionStatus,
-  SummaryDocument,
   ExpertProfile
 } from '@neobee/shared';
 import { getDb } from '../../lib/db.js';
@@ -51,8 +49,6 @@ export class SessionStore {
     const insightRows = db.prepare('SELECT id, session_id, round_number, expert_id, insight, rationale, refs, links FROM insight_refinement_data WHERE session_id = ? ORDER BY round_number').all(row.id);
     const reviewRows = db.prepare('SELECT * FROM cross_review_data WHERE session_id = ?').all(row.id);
     const ideaRows = db.prepare('SELECT * FROM idea_synthesis_data WHERE session_id = ?').all(row.id);
-    const graphRow = db.prepare('SELECT * FROM graph_build_data WHERE session_id = ?').get(row.id);
-    const summaryRow = db.prepare('SELECT * FROM summary_data WHERE session_id = ?').get(row.id);
     const errorRow = db.prepare('SELECT * FROM session_error WHERE session_id = ?').get(row.id);
     const checkpointRow = db.prepare('SELECT * FROM session_checkpoint WHERE session_id = ?').get(row.id);
 
@@ -157,15 +153,8 @@ export class SessionStore {
         totalScore: ir.total_score,
         controversyLabel: ir.controversy_label as any
       })),
-      graph: graphRow ? { nodes: JSON.parse(graphRow.nodes), edges: JSON.parse(graphRow.edges) } : { nodes: [], edges: [] },
-      summary: summaryRow
-        ? {
-            bestIdeas: JSON.parse(summaryRow.best_ideas),
-            controversialIdeas: JSON.parse(summaryRow.controversial_ideas),
-            unresolvedQuestions: JSON.parse(summaryRow.unresolved_questions),
-            executiveSummary: summaryRow.executive_summary
-          }
-        : null,
+      graph: { nodes: [], edges: [] },
+      summary: null,
       errors: errorRow ? JSON.parse(errorRow.errors) : []
     };
 
@@ -227,6 +216,45 @@ export class SessionStore {
     return [...this.sessions.values()].sort((a, b) => b.session.updatedAt.localeCompare(a.session.updatedAt));
   }
 
+  delete(sessionId: string): void {
+    const db = getDb();
+    const transaction = db.transaction(() => {
+      // Delete from all related tables
+      db.prepare('DELETE FROM session_event WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM session_error WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM session_checkpoint WHERE session_id = ?').run(sessionId);
+
+      // Stage data tables
+      const dataTables = [
+        'deep_research_data', 'expert_creation_data', 'insight_refinement_data',
+        'cross_review_data', 'idea_synthesis_data'
+      ];
+      for (const table of dataTables) {
+        db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(sessionId);
+      }
+
+      // Task and step tables (per-stage)
+      const stageTables = [
+        'topic_intake', 'deep_research', 'expert_creation', 'insight_refinement',
+        'cross_review', 'idea_synthesis'
+      ];
+      for (const stage of stageTables) {
+        // Steps reference tasks, delete them first
+        db.prepare(`DELETE FROM ${stage}_step WHERE task_id IN (SELECT id FROM ${stage}_task WHERE session_id = ?)`).run(sessionId);
+        db.prepare(`DELETE FROM ${stage}_task WHERE session_id = ?`).run(sessionId);
+      }
+
+      // Main session record
+      db.prepare('DELETE FROM session WHERE id = ?').run(sessionId);
+    });
+
+    transaction();
+
+    // Remove from in-memory maps
+    this.sessions.delete(sessionId);
+    this.events.delete(sessionId);
+  }
+
   get(sessionId: string): SessionAggregate | undefined {
     return this.sessions.get(sessionId);
   }
@@ -273,6 +301,38 @@ export class SessionStore {
 
   getCheckpoint(sessionId: string): SessionCheckpoint | null {
     return this.get(sessionId)?.checkpoint ?? null;
+  }
+
+  clearStageData(sessionId: string, fromStage: SessionStage): void {
+    const stageOrder: SessionStage[] = [
+      'deep_research', 'expert_creation', 'insight_refinement',
+      'cross_review', 'idea_synthesis'
+    ];
+    const startIndex = stageOrder.indexOf(fromStage);
+    if (startIndex === -1) return;
+
+    const aggregate = this.require(sessionId);
+    const db = getDb();
+
+    const stageConfigs: Record<SessionStage, { field: keyof SessionAggregate; resetValue: unknown; table: string }> = {
+      topic_intake: { field: 'session', resetValue: null, table: '' },
+      deep_research: { field: 'researchBrief', resetValue: null, table: 'deep_research_data' },
+      expert_creation: { field: 'experts', resetValue: [], table: 'expert_creation_data' },
+      insight_refinement: { field: 'rounds', resetValue: [], table: 'insight_refinement_data' },
+      cross_review: { field: 'reviews', resetValue: [], table: 'cross_review_data' },
+      idea_synthesis: { field: 'ideas', resetValue: [], table: 'idea_synthesis_data' }
+    };
+
+    for (let i = startIndex; i < stageOrder.length; i++) {
+      const stage = stageOrder[i];
+      const config = stageConfigs[stage];
+      (aggregate as any)[config.field] = config.resetValue;
+      db.prepare(`DELETE FROM ${config.table} WHERE session_id = ?`).run(sessionId);
+    }
+
+    this.clearCheckpoint(sessionId);
+    aggregate.session.updatedAt = new Date().toISOString();
+    this.persistSession(aggregate);
   }
 
   clearCheckpoint(sessionId: string): void {
@@ -404,34 +464,6 @@ export class SessionStore {
         idea.totalScore, idea.controversyLabel ?? null
       );
     }
-    this.persistSession(aggregate);
-    return aggregate;
-  }
-
-  setGraph(sessionId: string, graph: GraphData): SessionAggregate {
-    const aggregate = this.require(sessionId);
-    aggregate.graph = graph;
-    aggregate.session.updatedAt = new Date().toISOString();
-    const db = getDb();
-    db.prepare('INSERT OR REPLACE INTO graph_build_data (session_id, nodes, edges) VALUES (?, ?, ?)').run(
-      sessionId, JSON.stringify(graph.nodes), JSON.stringify(graph.edges)
-    );
-    this.persistSession(aggregate);
-    return aggregate;
-  }
-
-  setSummary(sessionId: string, summary: SummaryDocument): SessionAggregate {
-    const aggregate = this.require(sessionId);
-    aggregate.summary = summary;
-    aggregate.session.updatedAt = new Date().toISOString();
-    const db = getDb();
-    db.prepare(
-      `INSERT OR REPLACE INTO summary_data (session_id, best_ideas, controversial_ideas, unresolved_questions, executive_summary)
-       VALUES (?, ?, ?, ?, ?)`
-    ).run(
-      sessionId, JSON.stringify(summary.bestIdeas), JSON.stringify(summary.controversialIdeas),
-      JSON.stringify(summary.unresolvedQuestions), summary.executiveSummary
-    );
     this.persistSession(aggregate);
     return aggregate;
   }

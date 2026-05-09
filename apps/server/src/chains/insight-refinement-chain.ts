@@ -1,21 +1,19 @@
 import { PromptTemplate } from '@langchain/core/prompts';
-import { RunnableSequence } from '@langchain/core/runnables';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ExpertProfile, Insight, ResearchBrief, SessionRecord } from '@neobee/shared';
 import { getLLM, getLanguageParam } from '../lib/llm.js';
 
 const InsightLinkSchema = z.object({
-  targetInsightId: z.string(),
-  relationType: z.enum(['support', 'extend', 'contradict', 'reframe', 'risk']),
-  rationale: z.string()
+  targetInsightId: z.string().describe('ID of the insight being linked to'),
+  relationType: z.enum(['support', 'extend', 'contradict', 'reframe', 'risk']).describe('How this insight relates to the target'),
+  rationale: z.string().describe('Why this relationship exists')
 });
 
 const InsightSchema = z.object({
-  insight: z.string(),
-  rationale: z.string(),
-  references: z.array(z.string()),
-  links: z.array(InsightLinkSchema)
+  insight: z.string().describe('A clear, insightful position (2-3 sentences)'),
+  rationale: z.string().describe('Why this position makes sense given the expert perspective'),
+  references: z.array(z.string()).describe('1-2 reference names, or ["expert-analysis"]'),
+  links: z.array(InsightLinkSchema).describe('How this relates to previous insights from the same expert')
 });
 
 interface InsightRefinementInput {
@@ -31,35 +29,18 @@ const userPrompt = `Round {round}: Expert {expertName} (domain: {domain}, person
 Topic frame: {topicFrame}
 Focus on your expert domain and perspective.
 
-Generate ONE insight with:
-- insight: A clear, insightful position (2-3 sentences)
-- rationale: Why this position makes sense given the expert's perspective
-- references: 1-2 reference names (or ["expert-analysis"])
-- links: How this relates to previous insights from the same expert (if any)
+Expert's stance: {stance}
 
-Expert's stance: {stance}`;
+Generate ONE insight with all required fields.`;
 
 export class InsightRefinementChain {
   async run(input: InsightRefinementInput): Promise<Insight> {
-    const llm = getLLM();
     const lang = getLanguageParam(input.session);
-    const userPromptTemplate = userPrompt;
 
-    const chain = RunnableSequence.from([
-      PromptTemplate.fromTemplate(userPromptTemplate),
-      llm.withStructuredOutput(zodToJsonSchema(InsightSchema), { strict: false }),
-      (output) => {
-        const result = typeof output === 'string' ? JSON.parse(output) : output;
-        return {
-          ...result,
-          id: crypto.randomUUID(),
-          round: input.round,
-          expertId: input.expert.id
-        } as Insight;
-      }
-    ]);
+    const llm = getLLM().withStructuredOutput(InsightSchema);
+    const chain = PromptTemplate.fromTemplate(userPrompt).pipe(llm);
 
-    return chain.invoke({
+    const result = await chain.invoke({
       round: String(input.round),
       expertName: input.expert.name,
       domain: input.expert.domain,
@@ -71,5 +52,12 @@ export class InsightRefinementChain {
         : (lang === 'zh' ? '无' : 'None'),
       stance: input.expert.stance
     });
+
+    return {
+      ...result,
+      id: crypto.randomUUID(),
+      round: input.round,
+      expertId: input.expert.id
+    } as Insight;
   }
 }

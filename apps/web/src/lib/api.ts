@@ -76,5 +76,17 @@ export const api = {
     return apiRequest<TaskStepsResponse>(
       `/api/sessions/${sessionId}/tasks/${stage}?page=${page}&pageSize=${pageSize}`
     );
+  },
+
+  retrySession(sessionId: string): Promise<SessionAggregate> {
+    return apiRequest<SessionAggregate>(`/api/sessions/${sessionId}/retry`, {
+      method: 'POST'
+    });
+  },
+
+  deleteSession(sessionId: string): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>(`/api/sessions/${sessionId}`, {
+      method: 'DELETE'
+    });
   }
 };

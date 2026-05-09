@@ -8,7 +8,7 @@ export class IdeaSynthesisController extends StageController {
     if (!aggregate) return;
 
     if (aggregate.ideas.length > 0) {
-      this.advance(session.id, 'graph_build');
+      this.store.setStatus(session.id, 'completed', null);
       return;
     }
 
@@ -24,6 +24,6 @@ export class IdeaSynthesisController extends StageController {
     this.store.setIdeas(session.id, ideas);
     this.completeTask(session.id);
     this.eventBus.emitRaw(session.id, 'idea.generated', 'idea_synthesis', { ideas });
-    this.advance(session.id, 'graph_build');
+    this.store.setStatus(session.id, 'completed', null);
   }
 }

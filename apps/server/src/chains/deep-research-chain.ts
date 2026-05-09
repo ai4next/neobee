@@ -1,29 +1,34 @@
 import { PromptTemplate } from '@langchain/core/prompts';
-import { RunnableSequence } from '@langchain/core/runnables';
 import { z } from 'zod';
 import type { ResearchBrief, ResearchProgress, SessionRecord } from '@neobee/shared';
 import { getLLM, getLanguageParam } from '../lib/llm.js';
-import { getSearchTool, SearchResponseSchema } from '../lib/search.js';
+import { getSearchTool } from '../lib/search.js';
 
 // ====== STAGE 1: Intent Parsing & Query Generation (LLM-1) ======
 const QueryGenerationSchema = z.object({
   primaryQuery: z.string().describe('Main search query for broad information retrieval'),
-  subQueries: z.array(z.string()).describe('Sub-queries to cover different aspects of the topic'),
+  subQueries: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') return val.split('\n').map(s => s.trim()).filter(Boolean);
+      return val;
+    },
+    z.array(z.string()).describe('Sub-queries to cover different aspects of the topic')
+  ),
   searchStrategy: z.string().describe('Overall search strategy explanation')
 });
 
 // ====== STAGE 2: Fact Extraction & Gap Identification (LLM-2) ======
 const FactExtractionSchema = z.object({
   facts: z.array(z.object({
-    fact: z.string(),
-    source: z.string(),
-    sourceUrl: z.string().optional(),
-    confidence: z.enum(['high', 'medium', 'low'])
-  })),
+    fact: z.string().describe('A verifiable piece of information extracted from search results'),
+    source: z.string().describe('The source of the fact'),
+    sourceUrl: z.string().optional().describe('URL link to the source'),
+    confidence: z.enum(['high', 'medium', 'low']).describe('Confidence level in the fact accuracy')
+  })).describe('Extracted verifiable facts with source attribution'),
   knowledgeGaps: z.array(z.object({
-    gap: z.string(),
-    whyItMatters: z.string().optional()
-  })),
+    gap: z.string().describe('Area where information is missing, contradictory, or outdated'),
+    whyItMatters: z.string().optional().describe('Why filling this gap is important')
+  })).describe('Identified knowledge gaps in the research'),
   keyEntities: z.array(z.string()).describe('Important entities, organizations, or terms mentioned'),
   timeline: z.string().optional().describe('Historical timeline or chronology if relevant')
 });
@@ -31,40 +36,40 @@ const FactExtractionSchema = z.object({
 // ====== STAGE 3: Analysis & Synthesis (LLM-3) ======
 const AnalysisSchema = z.object({
   questions: z.array(z.object({
-    question: z.string(),
-    importance: z.number().min(1).max(5),
-    answerable: z.boolean(),
-    suggestedApproach: z.string().optional()
-  })),
-  priorityOrder: z.array(z.number()),
+    question: z.string().describe('An important unanswered question about the topic'),
+    importance: z.number().min(1).max(5).describe('Importance rating of the question (1-5)'),
+    answerable: z.boolean().describe('Whether this question can be answered with available information'),
+    suggestedApproach: z.string().optional().describe('Suggested method to find the answer')
+  })).describe('Most important unanswered questions ranked by importance'),
+  priorityOrder: z.array(z.number()).describe('Indices ordering questions by priority'),
   signals: z.array(z.object({
-    signal: z.string(),
-    trend: z.string(),
-    evidence: z.string(),
-    timeframe: z.enum(['immediate', 'short_term', 'medium_term', 'long_term'])
-  })),
-  emergingThemes: z.array(z.string()),
-  frame: z.string(),
-  scope: z.string(),
-  keyDimensions: z.array(z.string()),
-  framingAssumptions: z.array(z.string()),
-  topicFrame: z.string(),
-  keyFacts: z.array(z.string()),
-  openQuestions: z.array(z.string()),
-  signalsSummary: z.array(z.string()),
-  sourceRefs: z.array(z.string())
+    signal: z.string().describe('An emerging signal or trend identifier'),
+    trend: z.string().describe('Description of the trend direction'),
+    evidence: z.string().describe('Evidence supporting this signal'),
+    timeframe: z.enum(['immediate', 'short_term', 'medium_term', 'long_term']).describe('Expected timeframe for this signal to materialize')
+  })).describe('Emerging signals and trends analysis'),
+  emergingThemes: z.array(z.string()).describe('Key themes emerging from the research'),
+  frame: z.string().describe('Core framing of the problem or opportunity space'),
+  scope: z.string().describe('Boundaries and scope of the research'),
+  keyDimensions: z.array(z.string()).describe('Key dimensions or axes defining the space'),
+  framingAssumptions: z.array(z.string()).describe('Assumptions underlying the current framing'),
+  topicFrame: z.string().describe('Concise framing of the opportunity space'),
+  keyFacts: z.array(z.string()).describe('Key facts that define this space'),
+  openQuestions: z.array(z.string()).describe('Important open questions remaining'),
+  signalsSummary: z.array(z.string()).describe('Signals or trends to consider'),
+  sourceRefs: z.array(z.string()).describe('Relevant reference names or URLs')
 });
 
 // ====== PROMPTS ======
 const prompts = {
-  queryGeneration: `Analyze the research topic "{topic}" and generate effective search queries.
+  queryGeneration: `Analyze the topic "{topic}" and generate search queries.
 
 Background context: {additionalInfo}
 
-Your task:
-1. Create ONE primary query that captures the core topic for broad initial search
-2. Generate 3-5 sub-queries to cover different aspects (e.g., definitions, history, current state, controversies, future outlook)
-3. Explain the search strategy
+Generate:
+- 1 primary query
+- 3-5 sub-queries
+- A search strategy
 
 The topic is for {language} language audience.`,
 
@@ -73,11 +78,11 @@ The topic is for {language} language audience.`,
 Search Results:
 {searchResults}
 
-Your task:
-1. Extract all verifiable facts with source attribution
-2. Identify knowledge gaps - areas where information is missing, contradictory, or outdated
-3. Note key entities (people, organizations, concepts)
-4. Build a timeline if chronological information is available
+Output:
+- All verifiable facts with source attribution
+- Knowledge gaps where information is missing or contradictory
+- Key entities, organizations, or concepts
+- A timeline if chronological information exists
 
 Be critical - distinguish facts from opinions, flag low-confidence information.`,
 
@@ -89,16 +94,11 @@ Facts gathered:
 Knowledge gaps identified:
 {knowledgeGaps}
 
-Your task:
-1. Identify the 5-10 most important unanswered questions, ranked by importance
-2. Analyze emerging signals and trends (weak signals, counter-intuitive indicators)
-3. Create a concise framing that defines the opportunity/problem space
-4. Based on all above, directly output the final ResearchBrief with:
-   - topicFrame: A concise framing of the opportunity space
-   - keyFacts: 3-5 key facts that define this space
-   - openQuestions: 2-3 important open questions
-   - signalsSummary: 2-3 signals or trends to consider
-   - sourceRefs: relevant reference names/URLs`
+Output:
+- Most important unanswered questions (ranked by importance)
+- Emerging signals and trends
+- A concise framing of the opportunity space
+- Key facts, open questions, signals, and source references`
 };
 
 export interface DeepResearchChainCallbacks {
@@ -131,16 +131,8 @@ export class DeepResearchChain {
   }
 
   private createChain(schema: z.ZodSchema, promptTemplate: string) {
-    const llm = getLLM();
-    const prompt = PromptTemplate.fromTemplate(promptTemplate);
-    return RunnableSequence.from([
-      prompt,
-      llm.withStructuredOutput(schema, { strict: false }),
-      (output) => {
-        if (typeof output === 'string') return JSON.parse(output);
-        return output;
-      }
-    ]);
+    const llm = getLLM().withStructuredOutput(schema);
+    return PromptTemplate.fromTemplate(promptTemplate).pipe(llm);
   }
 
   private formatSearchResults(results: { title: string; url: string; content: string }[]): string {
@@ -148,7 +140,6 @@ export class DeepResearchChain {
   }
 
   async run(session: SessionRecord, callbacks?: DeepResearchChainCallbacks): Promise<ResearchBrief> {
-    console.log("deepresearch run")
     const lang = getLanguageParam(session);
     const searchTool = getSearchTool('mock');
 
@@ -185,7 +176,6 @@ export class DeepResearchChain {
     this.emitProgress(callbacks, 'gathering_facts', lang === 'zh' ? '进行第一轮广域搜索...' : 'Performing first round broad search...');
 
     const allQueries = [queryGen.primaryQuery, ...queryGen.subQueries];
-    // console.log('allQueries:', allQueries);
     const searchPromises = allQueries.map(q => searchTool.search(q, 5));
     const searchResponses = await Promise.all(searchPromises);
 
@@ -223,7 +213,6 @@ export class DeepResearchChain {
       this.emitProgress(callbacks, 'gathering_facts', lang === 'zh' ? '针对缺口进行靶向搜索...' : 'Performing targeted search for gaps...');
 
       const gapQueries = findings.knowledgeGaps.slice(0, 5).map(g => g.gap);
-      // console.log('gapQueries:', gapQueries);
       const gapSearchPromises = gapQueries.map(q => searchTool.search(q, 5));
       const gapResponses = await Promise.all(gapSearchPromises);
 

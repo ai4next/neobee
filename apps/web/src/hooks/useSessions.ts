@@ -95,6 +95,38 @@ export function useSessions(language: string) {
     }
   }
 
+  async function retrySession(): Promise<void> {
+    if (!session) return;
+    setIsSubmitting(true);
+    setError(null);
+    resetTaskProgress();
+
+    try {
+      const aggregate = await api.retrySession(session.session.id);
+      setSession(aggregate);
+      setSessions((previous) => mergeSessionList(previous, aggregate));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Retry failed');
+      setIsSubmitting(false);
+    }
+  }
+
+  async function deleteSession(sessionId: string): Promise<void> {
+    try {
+      await api.deleteSession(sessionId);
+      setSessions((previous) => previous.filter((s) => s.session.id !== sessionId));
+      if (session?.session.id === sessionId) {
+        setSession(null);
+        setEvents([]);
+        setError(null);
+        resetTaskProgress();
+        setSelectedStage('topic_intake');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    }
+  }
+
   function selectSession(nextSession: SessionAggregate): void {
     setSession(nextSession);
     setEvents([]);
@@ -122,6 +154,8 @@ export function useSessions(language: string) {
     isSubmitting,
     error,
     createAndRunSession,
+    retrySession,
+    deleteSession,
     selectSession,
     prepareNewSession
   };

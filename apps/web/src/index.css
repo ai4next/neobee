@@ -3,23 +3,23 @@
    ============================ */
 
 :root {
-  /* Core colors - research desk */
-  --bg: #eef1eb;
-  --bg-strong: #dde4d8;
+  /* Core colors - white & blue clean theme */
+  --bg: #f0f4f9;
+  --bg-strong: #e2e8f0;
   --panel: #ffffff;
-  --panel-strong: #f7f6f1;
-  --ink: #1e2a24;
-  --muted: #6a766d;
-  --line: #d6ddd4;
-  --accent: #0f766e;
-  --accent-soft: rgba(15, 118, 110, 0.12);
-  --accent-hover: #115e59;
-  --support: #3f7d47;
-  --support-soft: rgba(63, 125, 71, 0.15);
-  --risk: #c2410c;
-  --risk-soft: rgba(194, 65, 12, 0.15);
-  --shadow: 0 10px 30px rgba(42, 53, 47, 0.08);
-  --shadow-lg: 0 16px 48px rgba(42, 53, 47, 0.14);
+  --panel-strong: #f8fafc;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dce2ed;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.10);
+  --accent-hover: #1d4ed8;
+  --support: #059669;
+  --support-soft: rgba(5, 150, 105, 0.12);
+  --risk: #dc2626;
+  --risk-soft: rgba(220, 38, 38, 0.12);
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.10);
 
   /* Animation tokens */
   --ease-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -64,7 +64,7 @@ body {
   min-height: 100%;
   height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 24%),
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 24%),
     linear-gradient(180deg, #f4f6f2 0%, var(--bg) 100%);
   color: var(--ink);
   font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;

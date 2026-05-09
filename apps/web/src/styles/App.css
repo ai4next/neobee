@@ -156,7 +156,7 @@
 .nb-switch-btn.active {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 
 .nb-header-status {
@@ -243,124 +243,98 @@
 
 .nb-workbench-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-height: 0;
   flex: 1;
 }
 
-.nb-session-overview {
+.nb-stage-header {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
 
-.nb-overview-hero,
+.nb-stage-header > .nb-stage-nav-bar {
+  margin-bottom: 0;
+}
+
+/* ============================
+   Shared Card Item (StageNavBar & Stats)
+   ============================ */
+
+.nb-stage-nav-bar-item,
+.nb-overview-stat {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+/* ============================
+   Overview Stats Panel (Right)
+   ============================ */
+
 .nb-overview-stats {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px;
+  gap: 10px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: var(--shadow);
 }
 
-.nb-overview-hero {
-  padding: 18px 20px;
-  background:
-    linear-gradient(135deg, rgba(15, 118, 110, 0.08), transparent 55%),
-    var(--panel);
-}
-
-.nb-overview-hero h2 {
-  margin: 8px 0 10px;
-  font-size: 1.4rem;
-  line-height: 1.2;
-}
-
-.nb-overview-hero p,
-.nb-overview-label {
-  margin: 0;
-  color: var(--muted);
-}
-
-.nb-overview-label {
-  font-size: 0.74rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.nb-overview-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 10px;
-  gap: 10px;
-}
-
 .nb-overview-stat {
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--panel-strong);
-  border: 1px solid var(--line);
-  display: grid;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
+  padding: 8px 12px;
 }
 
 .nb-overview-stat span {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
 .nb-overview-stat strong {
-  font-size: 1.3rem;
+  font-size: 1rem;
 }
 
-.nb-activity-rail {
-  display: grid;
-  gap: 18px;
-  align-content: start;
-}
-
-.nb-event-feed {
-  display: grid;
-  gap: 10px;
-}
-
-.nb-event-row {
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--panel-strong);
-  border: 1px solid var(--line);
-  display: grid;
-  gap: 6px;
-}
-
-.nb-event-meta {
+.nb-retry-banner {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
-
-.nb-stage-guidance {
-  display: grid;
-  gap: 12px;
-}
-
-.nb-stage-guidance p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.nb-stage-guidance-metrics {
-  display: grid;
-  gap: 8px;
-  color: var(--ink);
+.nb-retry-message {
   font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--risk);
 }
+.nb-retry-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: var(--risk);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.83rem;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--transition-normal);
+}
+.nb-retry-btn:hover { opacity: 0.85; }
+.nb-retry-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .nb-workbench::-webkit-scrollbar {
   width: 6px;

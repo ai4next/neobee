@@ -27,10 +27,6 @@ function getStageMetric(session: SessionAggregate | null, stage: SessionStage): 
       return session.reviews.length;
     case 'idea_synthesis':
       return session.ideas.length;
-    case 'graph_build':
-      return session.graph.nodes.length;
-    case 'summary':
-      return session.summary?.bestIdeas.length ?? 0;
     default:
       return null;
   }
@@ -51,10 +47,13 @@ export default function StageNavBar({
         {stageMeta.map((meta, index) => {
           const isActive = currentStage === meta.stage;
           const currentIndex = stageMeta.findIndex((item) => item.stage === currentStage);
-          const isCompleted = currentIndex > index;
+          const isCompleted = currentIndex > index || session?.session.status === 'completed';
           const isSelected = selectedStage === meta.stage;
           const progress = taskProgress[meta.stage];
           const metric = getStageMetric(session, meta.stage);
+          const hasMore = metric !== null;
+
+          const showDot = isActive && session?.session.status !== 'completed';
 
           return (
             <button
@@ -67,10 +66,10 @@ export default function StageNavBar({
                 <span className="nb-stage-nav-bar-name">{t(meta.stage)}</span>
                 <span className="nb-stage-nav-bar-subline">
                   {progress?.status === 'running' ? `${progress.progress}%` : t(isCompleted ? 'completed' : 'pending')}
-                  {metric !== null ? ` • ${metric}` : ''}
+                  {hasMore ? ` • ${metric}` : ''}
                 </span>
               </span>
-              {isActive && <span className="nb-stage-nav-bar-dot" />}
+              {showDot && <span className="nb-stage-nav-bar-dot" />}
             </button>
           );
         })}

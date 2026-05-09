@@ -80,6 +80,7 @@
   text-align: left;
   cursor: pointer;
   transition: all var(--transition-fast);
+  position: relative;
 }
 
 .nb-session-item:hover {
@@ -114,4 +115,34 @@
 
 .nb-session-item.active .nb-session-item-status {
   color: var(--accent);
+}
+
+/* Delete button */
+.nb-session-delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.nb-session-item:hover .nb-session-delete-btn {
+  opacity: 0.6;
+}
+
+.nb-session-delete-btn:hover {
+  opacity: 1 !important;
+  background: var(--danger-soft, rgba(239, 68, 68, 0.1));
+  color: var(--danger, #ef4444);
 }

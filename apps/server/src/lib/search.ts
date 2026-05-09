@@ -225,7 +225,6 @@ class MockSearchTool implements SearchTool {
       results = this.mockData.get('__default__') || [];
     }
 
-    console.log(query)
     return {
       query,
       results: results.slice(0, numResults)
@@ -242,7 +241,6 @@ class LLMSearchTool implements SearchTool {
   private fallbackContent: SearchResponse | null = null;
 
   async search(query: string, numResults: number = 10): Promise<SearchResponse> {
-    console.log("当前时间：", new Date().toLocaleString());
     return { results: [], query };
   }
 
@@ -302,7 +300,6 @@ export async function searchWithLLMFallback(
 
   // If primary search returns empty results, use LLM
   if (results.results.length === 0) {
-    console.log(`Primary search returned empty, falling back to LLM for: ${query}`);
     const llmSearch = new LLMSearchTool();
     return llmSearch.search(query, numResults);
   }

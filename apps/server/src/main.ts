@@ -174,6 +174,24 @@ app.post('/api/sessions/:id/cancel', (req, res) => {
   }
 });
 
+app.post('/api/sessions/:id/retry', (req, res) => {
+  try {
+    const result = sessionsService.retrySession(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+app.delete('/api/sessions/:id', (req, res) => {
+  try {
+    sessionsService.deleteSession(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(404).json({ error: err instanceof Error ? err.message : 'Not found' });
+  }
+});
+
 app.get('/api/sessions/:id/tasks/:stage', (req, res) => {
   try {
     const { id, stage } = req.params;
