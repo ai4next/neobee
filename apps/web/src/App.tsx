@@ -1,18 +1,24 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CreateSessionInput, SessionAggregate } from '@neobee/shared';
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import type { CreateSessionInput, SessionAggregate, SessionStage } from '@neobee/shared';
 import './styles/App.css';
 import './styles/Forms.css';
 import SessionList from './components/SessionList';
 import StageNavBar from './components/StageNavBar';
-import TopicIntakeCard from './components/stage-card/TopicIntakeCard';
-import ResearchCard from './components/stage-card/ResearchCard';
-import ExpertsCard from './components/stage-card/ExpertsCard';
-import InsightRefinementCard from './components/stage-card/InsightRefinementCard';
-import CrossReviewCard from './components/stage-card/CrossReviewCard';
-import IdeasCard from './components/stage-card/IdeasCard';
 import { ConfigSettings } from './components/ConfigSettings';
 import { useSessions } from './hooks/useSessions';
+
+const TopicIntakeCard = lazy(() => import('./components/stage-card/TopicIntakeCard'));
+const ResearchCard = lazy(() => import('./components/stage-card/ResearchCard'));
+const ExpertsCard = lazy(() => import('./components/stage-card/ExpertsCard'));
+const InsightRefinementCard = lazy(() => import('./components/stage-card/InsightRefinementCard'));
+const CrossReviewCard = lazy(() => import('./components/stage-card/CrossReviewCard'));
+const IdeasCard = lazy(() => import('./components/stage-card/IdeasCard'));
+
+function Skeleton() {
+  return <div className="nb-skeleton">Loading...</div>;
+}
 
 const initialForm: CreateSessionInput = {
   topic: 'AI-native workflow ideas for solo founders',
@@ -22,8 +28,67 @@ const initialForm: CreateSessionInput = {
   language: 'en'
 };
 
+function SessionWorkbench({
+  session,
+  selectedStage,
+  taskProgress,
+  error,
+  isSubmitting,
+  form,
+  onFormChange,
+  onSubmit,
+  onNewSession,
+  onRetry
+}: {
+  session: SessionAggregate | null;
+  selectedStage: SessionStage;
+  taskProgress: any;
+  error: string | null;
+  isSubmitting: boolean;
+  form: CreateSessionInput;
+  onFormChange: (form: CreateSessionInput) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onNewSession: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      {error && (
+        <div className="nb-error-banner">
+          <span className="nb-error-message">{error}</span>
+        </div>
+      )}
+      {session?.session.status === 'failed' && (
+        <div className="nb-retry-banner">
+          <span className="nb-retry-message">Stage failed{error ? ': retrying may help' : ', click to retry'}</span>
+          <button className="nb-retry-btn" onClick={onRetry} disabled={isSubmitting}>
+            {isSubmitting ? 'Running...' : 'Retry'}
+          </button>
+        </div>
+      )}
+      {selectedStage === 'topic_intake' && (
+        <TopicIntakeCard
+          session={session}
+          form={form}
+          onFormChange={onFormChange}
+          onSubmit={onSubmit}
+          isSubmitting={isSubmitting}
+          error={error}
+          onNewSession={onNewSession}
+        />
+      )}
+      {selectedStage === 'deep_research' && <ResearchCard session={session} taskProgress={taskProgress.deep_research} />}
+      {selectedStage === 'expert_creation' && <ExpertsCard session={session} taskProgress={taskProgress.expert_creation} />}
+      {selectedStage === 'insight_refinement' && <InsightRefinementCard session={session} taskProgress={taskProgress.insight_refinement} />}
+      {selectedStage === 'cross_review' && <CrossReviewCard session={session} taskProgress={taskProgress.cross_review} />}
+      {selectedStage === 'idea_synthesis' && <IdeasCard session={session} taskProgress={taskProgress.idea_synthesis} />}
+    </Suspense>
+  );
+}
+
 export default function App() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [systemModalOpen, setSystemModalOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -69,10 +134,6 @@ export default function App() {
     setForm(initialForm);
   }
 
-  function handleSelectSession(nextSession: SessionAggregate) {
-    selectSession(nextSession);
-  }
-
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'en' ? 'zh' : 'en');
   };
@@ -86,17 +147,35 @@ export default function App() {
       ]
     : [];
 
+  function handleSelectSession(nextSession: SessionAggregate) {
+    selectSession(nextSession);
+    navigate(`/session/${nextSession.session.id}`);
+  }
+
   return (
     <main className={`neobee-shell${darkMode ? ' dark' : ''}`}>
       <section className="nb-main-grid">
         <div className="nb-panel left">
-          <SessionList
-            sessions={sessions}
-            currentSession={session}
-            onSelectSession={handleSelectSession}
-            onNewSession={handleNewSession}
-            onDeleteSession={deleteSession}
-          />
+          <Routes>
+            <Route path="/session/:id" element={
+              <SessionList
+                sessions={sessions}
+                currentSession={session}
+                onSelectSession={handleSelectSession}
+                onNewSession={handleNewSession}
+                onDeleteSession={deleteSession}
+              />
+            } />
+            <Route path="*" element={
+              <SessionList
+                sessions={sessions}
+                currentSession={session}
+                onSelectSession={handleSelectSession}
+                onNewSession={handleNewSession}
+                onDeleteSession={deleteSession}
+              />
+            } />
+          </Routes>
         </div>
 
         <div className="nb-panel right">
@@ -122,31 +201,18 @@ export default function App() {
 
           <div className="nb-workbench-grid">
             <div className="nb-workbench">
-              {session?.session.status === 'failed' && (
-                <div className="nb-retry-banner">
-                  <span className="nb-retry-message">{t('stageFailed') || 'Stage failed, click to retry'}</span>
-                  <button className="nb-retry-btn" onClick={retrySession} disabled={isSubmitting}>
-                    {isSubmitting ? t('running') : (t('retry') || 'Retry')}
-                  </button>
-                </div>
-              )}
-              {selectedStage === 'topic_intake' && (
-                <TopicIntakeCard
-                  session={session}
-                  form={form}
-                  onFormChange={setForm}
-                  onSubmit={handleSubmit}
-                  isSubmitting={isSubmitting}
-                  error={error}
-                  onNewSession={handleNewSession}
-                />
-              )}
-
-              {selectedStage === 'deep_research' && <ResearchCard session={session} taskProgress={taskProgress.deep_research} />}
-              {selectedStage === 'expert_creation' && <ExpertsCard session={session} taskProgress={taskProgress.expert_creation} />}
-              {selectedStage === 'insight_refinement' && <InsightRefinementCard session={session} taskProgress={taskProgress.insight_refinement} />}
-              {selectedStage === 'cross_review' && <CrossReviewCard session={session} taskProgress={taskProgress.cross_review} />}
-              {selectedStage === 'idea_synthesis' && <IdeasCard session={session} taskProgress={taskProgress.idea_synthesis} />}
+              <SessionWorkbench
+                session={session}
+                selectedStage={selectedStage}
+                taskProgress={taskProgress}
+                error={error}
+                isSubmitting={isSubmitting}
+                form={form}
+                onFormChange={setForm}
+                onSubmit={handleSubmit}
+                onNewSession={handleNewSession}
+                onRetry={retrySession}
+              />
             </div>
           </div>
         </div>
@@ -218,16 +284,8 @@ export default function App() {
       {systemModalOpen && (
         <div className="nb-modal-overlay" onClick={() => setSystemModalOpen(false)}>
           <div className="nb-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="nb-modal-header">
-              <button className="nb-modal-close" onClick={() => setSystemModalOpen(false)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
             <div className="nb-modal-body">
-              <ConfigSettings />
+              <ConfigSettings onClose={() => setSystemModalOpen(false)} />
             </div>
           </div>
         </div>

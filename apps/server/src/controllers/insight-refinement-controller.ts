@@ -1,6 +1,6 @@
-import type { SessionRecord } from '@neobee/shared';
+import type { SessionRecord, Insight } from '@neobee/shared';
 import { StageController } from './stage-controller.js';
-import { InsightRefinementChain } from '../chains/insight-refinement-chain.js';
+import { workerPool } from '../workers/worker-pool.js';
 
 export class InsightRefinementController extends StageController {
   protected async execute(session: SessionRecord): Promise<void> {
@@ -22,7 +22,6 @@ export class InsightRefinementController extends StageController {
     this.eventBus.emitRaw(session.id, 'insight_refinement.started', 'insight_refinement', {});
     this.createTask(session.id);
 
-    const chain = new InsightRefinementChain();
     const rounds = [...aggregate.rounds];
 
     // Resume from checkpoint cursor if available
@@ -47,8 +46,8 @@ export class InsightRefinementController extends StageController {
             rounds: updated.rounds,
             reviews: updated.reviews,
             ideas: updated.ideas,
-            graph: updated.graph,
-            insightRefinementCursor: null
+            insightRefinementCursor: null,
+            crossReviewCursor: null
           };
           this.store.saveCheckpoint(session.id, {
             ...checkpoint,
@@ -63,7 +62,7 @@ export class InsightRefinementController extends StageController {
           .filter((r) => r.expertId === expert.id)
           .flatMap((r) => r.insights);
 
-        const insight = await chain.run({
+        const insight = await workerPool.execute<Insight>('insight_refinement', {
           round,
           expert,
           session,

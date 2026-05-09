@@ -28,29 +28,11 @@ export interface SessionCheckpoint {
   rounds: SessionRound[];
   reviews: ReviewScore[];
   ideas: IdeaCandidate[];
-  graph: GraphData;
   // For insight refinement: tracks which expert/round combination we're at
   insightRefinementCursor: { expertIndex: number; roundIndex: number } | null;
+  // For cross review: tracks which experts have completed their reviews
+  crossReviewCursor: { completedExpertIds: string[] } | null;
 }
-
-export type InsightRelationType =
-  | 'support'
-  | 'extend'
-  | 'contradict'
-  | 'reframe'
-  | 'risk';
-
-export type GraphNodeType = 'topic' | 'expert' | 'insight' | 'idea';
-export type GraphEdgeType =
-  | 'generated'
-  | 'supports'
-  | 'extends'
-  | 'contradicts'
-  | 'reframes'
-  | 'flags_risk'
-  | 'contributes_to'
-  | 'reviewed'
-  | 'about';
 
 export interface CreateSessionInput {
   topic: string;
@@ -96,20 +78,12 @@ export interface ExpertProfile {
   skills: string[];
 }
 
-export interface InsightLink {
-  targetInsightId: string;
-  relationType: InsightRelationType;
-  rationale: string;
-}
-
 export interface Insight {
   id: string;
   round: number;
   expertId: string;
   insight: string;
   rationale: string;
-  references: string[];
-  links: InsightLink[];
 }
 
 export interface ReviewScore {
@@ -122,47 +96,18 @@ export interface ReviewScore {
   crossDomainLeverage: number;
   riskAwareness: number;
   comment: string;
-  objectionLevel: 'low' | 'medium' | 'high';
 }
 
 export interface IdeaCandidate {
   id: string;
   title: string;
   thesis: string;
-  supportingInsights: string[];
   whyNow: string;
   targetUser: string;
   coreMechanism: string;
   risks: string[];
   totalScore: number;
   controversyLabel?: 'wildcard';
-}
-
-export interface SummaryDocument {
-  bestIdeas: string[];
-  controversialIdeas: string[];
-  unresolvedQuestions: string[];
-  executiveSummary: string;
-}
-
-export interface GraphNode {
-  id: string;
-  type: GraphNodeType;
-  label: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface GraphEdge {
-  id: string;
-  type: GraphEdgeType;
-  source: string;
-  target: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface GraphData {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
 }
 
 export interface SessionRound {
@@ -180,14 +125,13 @@ export interface SessionAggregate {
   rounds: SessionRound[];
   reviews: ReviewScore[];
   ideas: IdeaCandidate[];
-  graph: GraphData;
-  summary: SummaryDocument | null;
   errors: string[];
 }
 
 export type SessionEventType =
   | 'session.created'
   | 'session.paused'
+  | 'session.stage_changed'
   | 'research.started'
   | 'research.progress'
   | 'research.completed'

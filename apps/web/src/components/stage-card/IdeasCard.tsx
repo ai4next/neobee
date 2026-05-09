@@ -17,7 +17,7 @@ interface IdeasCardProps {
 
 export default function IdeasCard({ session, taskProgress }: IdeasCardProps) {
   const { t } = useTranslation();
-  const isComplete = session?.session.currentStage !== 'idea_synthesis';
+  const isComplete = session?.session.status === 'completed';
 
   return (
     <article className="nb-stage-card">

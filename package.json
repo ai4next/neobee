@@ -18,7 +18,6 @@
   "dependencies": {
     "@langchain/community": "^1.1.28",
     "better-sqlite3": "^12.9.0",
-    "duck-duck-scrape": "^2.2.7",
-    "next-intl": "^4.11.0"
+    "duck-duck-scrape": "^2.2.7"
   }
 }

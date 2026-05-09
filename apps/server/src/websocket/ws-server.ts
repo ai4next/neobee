@@ -2,6 +2,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import type { SessionEvent } from '@neobee/shared';
 import { SessionsService } from '../modules/sessions/sessions.service.js';
 import type { Server } from 'http';
+import { logger } from '../lib/logger.js';
 
 interface ClientMessage {
   type: 'subscribe_session';
@@ -67,7 +68,7 @@ export function createWebSocketServer(
     });
   });
 
-  console.log('WebSocket server attached to HTTP server');
+  logger.info('WebSocket server attached to HTTP server');
 
   return wss;
 }

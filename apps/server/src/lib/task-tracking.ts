@@ -21,21 +21,8 @@ export interface StepRecord {
 
 export type TaskProgressCallback = (event: TaskProgressPayload) => void;
 
-type TaskTableName =
-  | 'topic_intake_task'
-  | 'deep_research_task'
-  | 'expert_creation_task'
-  | 'insight_refinement_task'
-  | 'cross_review_task'
-  | 'idea_synthesis_task';
-
-type StepTableName =
-  | 'topic_intake_step'
-  | 'deep_research_step'
-  | 'expert_creation_step'
-  | 'insight_refinement_step'
-  | 'cross_review_step'
-  | 'idea_synthesis_step';
+type TaskTableName = 'stage_task';
+type StepTableName = 'stage_step';
 
 interface TaskContext {
   taskId: string;
@@ -43,23 +30,8 @@ interface TaskContext {
   stage: SessionStage;
 }
 
-const TASK_TABLE_MAP: Record<SessionStage, TaskTableName> = {
-  topic_intake: 'topic_intake_task',
-  deep_research: 'deep_research_task',
-  expert_creation: 'expert_creation_task',
-  insight_refinement: 'insight_refinement_task',
-  cross_review: 'cross_review_task',
-  idea_synthesis: 'idea_synthesis_task'
-};
-
-const STEP_TABLE_MAP: Record<SessionStage, StepTableName> = {
-  topic_intake: 'topic_intake_step',
-  deep_research: 'deep_research_step',
-  expert_creation: 'expert_creation_step',
-  insight_refinement: 'insight_refinement_step',
-  cross_review: 'cross_review_step',
-  idea_synthesis: 'idea_synthesis_step'
-};
+const TASK_TABLE = 'stage_task' as const;
+const STEP_TABLE = 'stage_step' as const;
 
 function contextKey(sessionId: string, stage: SessionStage): string {
   return `${sessionId}:${stage}`;
@@ -77,12 +49,12 @@ export class TaskTracker {
     const db = getDb();
     const taskId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const taskTable = TASK_TABLE_MAP[stage];
+    const taskTable = TASK_TABLE;
 
     db.prepare(`
-      INSERT INTO ${taskTable} (id, session_id, status, progress, created_at, updated_at)
-      VALUES (?, ?, 'running', 0, ?, ?)
-    `).run(taskId, sessionId, now, now);
+      INSERT INTO ${taskTable} (id, session_id, stage, status, progress, created_at, updated_at)
+      VALUES (?, ?, ?, 'running', 0, ?, ?)
+    `).run(taskId, sessionId, stage, now, now);
 
     this.activeTasks.set(contextKey(sessionId, stage), { taskId, sessionId, stage });
     this.emitProgress({
@@ -113,12 +85,12 @@ export class TaskTracker {
     const db = getDb();
     const stepId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const stepTable = STEP_TABLE_MAP[stage];
+    const stepTable = STEP_TABLE;
 
     db.prepare(`
-      INSERT INTO ${stepTable} (id, task_id, name, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(stepId, context.taskId, name, JSON.stringify(data), now, now);
+      INSERT INTO ${stepTable} (id, task_id, stage, name, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(stepId, context.taskId, stage, name, JSON.stringify(data), now, now);
 
     const progress = this.getProgressFromStepName(name);
     this.updateTaskProgress(sessionId, stage, progress);
@@ -150,7 +122,7 @@ export class TaskTracker {
 
     const db = getDb();
     const now = new Date().toISOString();
-    const taskTable = TASK_TABLE_MAP[stage];
+    const taskTable = TASK_TABLE;
 
     db.prepare(`
       UPDATE ${taskTable} SET progress = ?, updated_at = ? WHERE id = ?
@@ -179,7 +151,7 @@ export class TaskTracker {
 
     const db = getDb();
     const now = new Date().toISOString();
-    const taskTable = TASK_TABLE_MAP[stage];
+    const taskTable = TASK_TABLE;
 
     db.prepare(`
       UPDATE ${taskTable} SET status = ?, progress = 100, updated_at = ? WHERE id = ?
@@ -200,22 +172,22 @@ export class TaskTracker {
 
   getTask(sessionId: string, stage: SessionStage): TaskRecord | null {
     const db = getDb();
-    const taskTable = TASK_TABLE_MAP[stage];
+    const taskTable = TASK_TABLE;
 
     const row = db.prepare(`
       SELECT id, session_id as sessionId, status, progress, created_at as createdAt, updated_at as updatedAt
       FROM ${taskTable}
-      WHERE session_id = ?
+      WHERE session_id = ? AND stage = ?
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(sessionId) as TaskRecord | undefined;
+    `).get(sessionId, stage) as TaskRecord | undefined;
 
     return row || null;
   }
 
   getSteps(taskId: string, stage: SessionStage): StepRecord[] {
     const db = getDb();
-    const stepTable = STEP_TABLE_MAP[stage];
+    const stepTable = STEP_TABLE;
 
     return db.prepare(`
       SELECT id, task_id as taskId, name, data, created_at as createdAt, updated_at as updatedAt

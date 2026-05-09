@@ -33,7 +33,6 @@ export default function SessionList({
       <div className="nb-session-list-header">
         <div>
           <h2>{t('sessions')}</h2>
-          <p>{t('workspaceSessions')}</p>
         </div>
         <button className="nb-session-new-btn" onClick={onNewSession} title={t('newSession')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -57,7 +56,7 @@ export default function SessionList({
               <span className="nb-session-item-topic">{session.session.topic}</span>
               <span className="nb-session-item-status">{session.session.status}</span>
               <span className="nb-session-item-meta">
-                {formatUpdatedAt(session.session.updatedAt)} • {t(session.session.currentStage ?? 'topic_intake')}
+                {formatUpdatedAt(session.session.updatedAt)} • {t(session.session.status === 'completed' ? 'completed' : (session.session.currentStage ?? 'topic_intake'))}
               </span>
               <button
                 className="nb-session-delete-btn"

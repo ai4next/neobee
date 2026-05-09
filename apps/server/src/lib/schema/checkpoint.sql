@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS session_checkpoint (
   rounds TEXT,
   reviews TEXT,
   ideas TEXT,
-  graph TEXT,
   insight_cursor TEXT,
+  cross_review_cursor TEXT,
   FOREIGN KEY (session_id) REFERENCES session(id)
 );

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ResearchBrief, ResearchProgress, SessionRecord } from '@neobee/shared';
 import { getLLM, getLanguageParam } from '../lib/llm.js';
 import { getSearchTool } from '../lib/search.js';
+import type { SearchProvider } from '../lib/search.js';
 
 // ====== STAGE 1: Intent Parsing & Query Generation (LLM-1) ======
 const QueryGenerationSchema = z.object({
@@ -22,37 +23,13 @@ const FactExtractionSchema = z.object({
   facts: z.array(z.object({
     fact: z.string().describe('A verifiable piece of information extracted from search results'),
     source: z.string().describe('The source of the fact'),
-    sourceUrl: z.string().optional().describe('URL link to the source'),
-    confidence: z.enum(['high', 'medium', 'low']).describe('Confidence level in the fact accuracy')
   })).describe('Extracted verifiable facts with source attribution'),
-  knowledgeGaps: z.array(z.object({
-    gap: z.string().describe('Area where information is missing, contradictory, or outdated'),
-    whyItMatters: z.string().optional().describe('Why filling this gap is important')
-  })).describe('Identified knowledge gaps in the research'),
+  knowledgeGaps: z.array(z.string()).describe('Identified knowledge gaps in the research'),
   keyEntities: z.array(z.string()).describe('Important entities, organizations, or terms mentioned'),
-  timeline: z.string().optional().describe('Historical timeline or chronology if relevant')
 });
 
 // ====== STAGE 3: Analysis & Synthesis (LLM-3) ======
 const AnalysisSchema = z.object({
-  questions: z.array(z.object({
-    question: z.string().describe('An important unanswered question about the topic'),
-    importance: z.number().min(1).max(5).describe('Importance rating of the question (1-5)'),
-    answerable: z.boolean().describe('Whether this question can be answered with available information'),
-    suggestedApproach: z.string().optional().describe('Suggested method to find the answer')
-  })).describe('Most important unanswered questions ranked by importance'),
-  priorityOrder: z.array(z.number()).describe('Indices ordering questions by priority'),
-  signals: z.array(z.object({
-    signal: z.string().describe('An emerging signal or trend identifier'),
-    trend: z.string().describe('Description of the trend direction'),
-    evidence: z.string().describe('Evidence supporting this signal'),
-    timeframe: z.enum(['immediate', 'short_term', 'medium_term', 'long_term']).describe('Expected timeframe for this signal to materialize')
-  })).describe('Emerging signals and trends analysis'),
-  emergingThemes: z.array(z.string()).describe('Key themes emerging from the research'),
-  frame: z.string().describe('Core framing of the problem or opportunity space'),
-  scope: z.string().describe('Boundaries and scope of the research'),
-  keyDimensions: z.array(z.string()).describe('Key dimensions or axes defining the space'),
-  framingAssumptions: z.array(z.string()).describe('Assumptions underlying the current framing'),
   topicFrame: z.string().describe('Concise framing of the opportunity space'),
   keyFacts: z.array(z.string()).describe('Key facts that define this space'),
   openQuestions: z.array(z.string()).describe('Important open questions remaining'),
@@ -69,9 +46,7 @@ Background context: {additionalInfo}
 Generate:
 - 1 primary query
 - 3-5 sub-queries
-- A search strategy
-
-The topic is for {language} language audience.`,
+- A search strategy`,
 
   factExtraction: `Extract factual information from the search results about "{topic}".
 
@@ -82,7 +57,6 @@ Output:
 - All verifiable facts with source attribution
 - Knowledge gaps where information is missing or contradictory
 - Key entities, organizations, or concepts
-- A timeline if chronological information exists
 
 Be critical - distinguish facts from opinions, flag low-confidence information.`,
 
@@ -94,9 +68,8 @@ Facts gathered:
 Knowledge gaps identified:
 {knowledgeGaps}
 
+use {language}
 Output:
-- Most important unanswered questions (ranked by importance)
-- Emerging signals and trends
 - A concise framing of the opportunity space
 - Key facts, open questions, signals, and source references`
 };
@@ -105,16 +78,16 @@ export interface DeepResearchChainCallbacks {
   onProgress?: (progress: ResearchProgress) => void;
 }
 
+interface DeepResearchChainRunParams {
+  session: SessionRecord;
+  callbacks?: DeepResearchChainCallbacks;
+  searchProvider?: SearchProvider;
+  searchApiKey?: string;
+}
+
 interface ResearchFindings {
   facts: { fact: string; source: string; sourceUrl?: string; confidence: 'high' | 'medium' | 'low' }[];
   knowledgeGaps: { gap: string; whyItMatters?: string }[];
-  questions: { question: string; importance: number; answerable: boolean; suggestedApproach?: string }[];
-  signals: { signal: string; trend: string; evidence: string; timeframe: 'immediate' | 'short_term' | 'medium_term' | 'long_term' }[];
-  emergingThemes: string[];
-  frame: string;
-  scope: string;
-  keyDimensions: string[];
-  framingAssumptions: string[];
   searchQueries: { primary: string; sub: string[] };
   searchResults: { title: string; url: string; content: string }[];
 }
@@ -139,23 +112,18 @@ export class DeepResearchChain {
     return results.map(r => `[${r.title}](${r.url})\n${r.content}`).join('\n\n---\n\n');
   }
 
-  async run(session: SessionRecord, callbacks?: DeepResearchChainCallbacks): Promise<ResearchBrief> {
+  async run({ session, callbacks, searchProvider, searchApiKey }: DeepResearchChainRunParams): Promise<ResearchBrief> {
     const lang = getLanguageParam(session);
-    const searchTool = getSearchTool('mock');
+    const outputLang = lang === 'zh' ? 'Chinese' : 'English';
 
     const findings: ResearchFindings = {
       facts: [],
       knowledgeGaps: [],
-      questions: [],
-      signals: [],
-      emergingThemes: [],
-      frame: '',
-      scope: '',
-      keyDimensions: [],
-      framingAssumptions: [],
       searchQueries: { primary: '', sub: [] },
       searchResults: []
     };
+
+    const searchTool = getSearchTool(searchProvider, searchApiKey);
 
     // ====== STAGE 1: Intent Parsing & Query Generation (LLM-1) ======
     this.emitProgress(callbacks, 'initializing', lang === 'zh' ? '正在解析研究意图...' : 'Parsing research intent...');
@@ -164,7 +132,6 @@ export class DeepResearchChain {
     const queryGen = await queryChain.invoke({
       topic: session.topic,
       additionalInfo: session.additionalInfo || (lang === 'zh' ? '无' : 'None'),
-      language: lang === 'zh' ? '中文' : 'English'
     }) as { primaryQuery: string; subQueries: string[]; searchStrategy: string };
 
     findings.searchQueries = {
@@ -202,7 +169,6 @@ export class DeepResearchChain {
       facts: { fact: string; source: string; sourceUrl?: string; confidence: 'high' | 'medium' | 'low' }[];
       knowledgeGaps: { gap: string; whyItMatters?: string }[];
       keyEntities: string[];
-      timeline?: string;
     };
 
     findings.facts = factExtraction.facts;
@@ -244,7 +210,8 @@ export class DeepResearchChain {
     const analysis = await analysisChain.invoke({
       topic: session.topic,
       facts: findings.facts.map(f => `[${f.source}] ${f.fact}`).join('\n'),
-      knowledgeGaps: findings.knowledgeGaps.map(g => g.gap).join('\n')
+      knowledgeGaps: findings.knowledgeGaps.map(g => g.gap).join('\n'),
+      language: outputLang
     });
 
     const result: ResearchBrief = {

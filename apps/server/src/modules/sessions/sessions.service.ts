@@ -23,6 +23,7 @@ export class SessionsService {
     this.store.clearErrors(sessionId);
     this.store.setStatus(sessionId, 'researching', 'deep_research');
     this.eventBus.emitRaw(sessionId, 'task.started', 'deep_research', { sessionId, stage: 'deep_research' });
+    this.eventBus.emitRaw(sessionId, 'session.stage_changed', 'deep_research', { from: 'topic_intake', to: 'deep_research' });
     return this.requireSession(sessionId);
   }
 
@@ -40,6 +41,7 @@ export class SessionsService {
     const status = this.stageToStatus(stage);
     this.store.setStatus(sessionId, status as any, stage);
     this.eventBus.emitRaw(sessionId, 'task.started', stage, { sessionId, stage });
+    this.eventBus.emitRaw(sessionId, 'session.stage_changed', stage, { from: 'paused', to: stage });
     return this.requireSession(sessionId);
   }
 
@@ -72,6 +74,7 @@ export class SessionsService {
     this.store.setStatus(sessionId, status as SessionStatus, failedStage);
 
     this.eventBus.emitRaw(sessionId, 'task.started', failedStage, { sessionId, stage: failedStage });
+    this.eventBus.emitRaw(sessionId, 'session.stage_changed', failedStage, { from: 'failed', to: failedStage });
 
     return this.requireSession(sessionId);
   }
@@ -87,14 +90,6 @@ export class SessionsService {
 
   getSessionState(sessionId: string): SessionAggregate {
     return this.requireSession(sessionId);
-  }
-
-  getGraph(sessionId: string) {
-    return this.getSessionState(sessionId).graph;
-  }
-
-  getSummary(sessionId: string) {
-    return this.getSessionState(sessionId).summary;
   }
 
   getEvents(sessionId: string): SessionEvent[] {

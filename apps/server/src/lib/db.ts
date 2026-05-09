@@ -27,10 +27,17 @@ export function getDb(): BetterSqlite3.Database {
 function initSchema(database: BetterSqlite3.Database): void {
   database.exec(readSqlFile('system.sql'));
   database.exec(readSqlFile('checkpoint.sql'));
-  database.exec(readSqlFile('topic-intake.sql'));
+  database.exec(readSqlFile('task-tracking.sql'));
   database.exec(readSqlFile('deep-research.sql'));
   database.exec(readSqlFile('expert-creation.sql'));
   database.exec(readSqlFile('insight-refinement.sql'));
   database.exec(readSqlFile('cross-review.sql'));
   database.exec(readSqlFile('idea-synthesis.sql'));
+
+  // Migration: add cross_review_cursor column to existing databases
+  try {
+    database.exec('ALTER TABLE session_checkpoint ADD COLUMN cross_review_cursor TEXT');
+  } catch {
+    // Column already exists — ignore
+  }
 }

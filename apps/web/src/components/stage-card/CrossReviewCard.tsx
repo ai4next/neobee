@@ -45,9 +45,6 @@ export default function CrossReviewCard({ session, taskProgress }: CrossReviewCa
             <div key={idx} className="nb-review-item">
               <div className="nb-review-header">
                 <span className="nb-review-expert">{review.reviewerExpertId}</span>
-                <span className={`nb-review-objection objection-${review.objectionLevel}`}>
-                  {review.objectionLevel}
-                </span>
               </div>
               <div className="nb-review-scores">
                 <span>N: {review.novelty}</span>

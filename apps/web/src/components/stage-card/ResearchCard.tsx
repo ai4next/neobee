@@ -114,5 +114,3 @@ export default function ResearchCard({ session, taskProgress }: ResearchCardProp
     </article>
   );
 }
-
-export { MetricList };

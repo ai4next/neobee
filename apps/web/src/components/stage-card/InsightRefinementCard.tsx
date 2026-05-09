@@ -14,12 +14,6 @@ interface InsightRefinementProps {
   taskProgress?: TaskProgressData;
 }
 
-function mapRelationClass(relationType: string) {
-  if (relationType === 'contradict' || relationType === 'risk') return 'risk';
-  if (relationType === 'support') return 'support';
-  return 'neutral';
-}
-
 export default function InsightRefinement({ session, taskProgress }: InsightRefinementProps) {
   const { t } = useTranslation();
   const isComplete = session?.session.currentStage !== 'insight_refinement';
@@ -59,11 +53,6 @@ export default function InsightRefinement({ session, taskProgress }: InsightRefi
               <div key={insight.id} className="nb-round-item">
                 <div className="nb-round-statement">{insight.insight}</div>
                 <div className="nb-round-rationale">{insight.rationale}</div>
-                {insight.links[0] ? (
-                  <div className={`nb-round-link ${mapRelationClass(insight.links[0].relationType)}`}>
-                    {mapRelationClass(insight.links[0].relationType)} {'→'} {insight.links[0].targetInsightId.slice(0, 8)}
-                  </div>
-                ) : null}
               </div>
             ))}
           </div>

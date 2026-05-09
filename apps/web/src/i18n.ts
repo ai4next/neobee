@@ -8,7 +8,6 @@ const en = {
   sessions: 'Sessions',
   newSession: 'New Session',
   noSessions: 'No sessions yet',
-  workspaceSessions: 'Research runs in this workspace',
   topicPlaceholder: 'Describe your topic or question...',
   sessionConfig: 'Session Config',
   topic: 'Topic',
@@ -58,7 +57,15 @@ const en = {
   stageFailed: 'Stage failed, click to retry',
   completed: 'Completed',
   pending: 'Pending',
-  deleteSession: 'Delete session'
+  deleteSession: 'Delete session',
+  searchEngine: 'Search Engine',
+  searchEngineDesc: 'Select which search engine to use for deep research',
+  duckduckgo: 'DuckDuckGo',
+  tavily: 'Tavily',
+  llm: 'LLM (LLM-based)',
+  apiKey: 'API Key',
+  tavilyApiKeyPlaceholder: 'Enter your Tavily API key',
+  tavilyHint: 'The API key will be saved to config and used for search requests'
 };
 
 const zh = {
@@ -67,7 +74,6 @@ const zh = {
   sessions: '会话',
   newSession: '新建会话',
   noSessions: '还没有会话',
-  workspaceSessions: '当前工作区的研究记录',
   topicPlaceholder: '描述你的主题或问题...',
   sessionConfig: '会话配置',
   topic: '主题',
@@ -117,7 +123,15 @@ const zh = {
   stageFailed: '阶段执行失败，点击重试',
   completed: '已完成',
   pending: '待处理',
-  deleteSession: '删除会话'
+  deleteSession: '删除会话',
+  searchEngine: '搜索引擎',
+  searchEngineDesc: '选择深度研究使用的搜索引擎',
+  duckduckgo: 'DuckDuckGo',
+  tavily: 'Tavily',
+  llm: 'LLM（基于 LLM 搜索）',
+  apiKey: 'API 密钥',
+  tavilyApiKeyPlaceholder: '输入你的 Tavily API 密钥',
+  tavilyHint: 'API 密钥将保存到配置中，用于搜索请求'
 };
 
 i18n

@@ -1,7 +1,7 @@
-import { PromptTemplate } from '@langchain/core/prompts'; 
+import { PromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import type { ExpertProfile, ResearchBrief, SessionRecord } from '@neobee/shared';
-import { getLLM } from '../lib/llm.js';
+import { getLLM, getLanguageParam } from '../lib/llm.js';
 
 const ExpertProfileSchema = z.object({
   name: z.string().describe('A realistic first name and title'),
@@ -18,10 +18,16 @@ const ExpertsOutputSchema = z.object({
 const userPrompt = `Create {expertCount} expert profiles for topic "{topic}".
 
 Topic frame: {topicFrame}
-Open questions: {openQuestions}`;
+Open questions: {openQuestions}
+
+use {language}
+Return valid JSON with an "experts" array.`;
 
 export class ExpertCreationChain {
   async run(session: SessionRecord, researchBrief: ResearchBrief): Promise<ExpertProfile[]> {
+    const lang = getLanguageParam(session);
+    const outputLang = lang === 'zh' ? 'Chinese' : 'English';
+
     const llm = getLLM().withStructuredOutput(ExpertsOutputSchema);
 
     const prompt = PromptTemplate.fromTemplate(userPrompt);
@@ -32,7 +38,8 @@ export class ExpertCreationChain {
       expertCount: String(session.expertCount),
       topic: session.topic,
       topicFrame: researchBrief.topicFrame,
-      openQuestions: researchBrief.openQuestions.join('; ')
+      openQuestions: researchBrief.openQuestions.join('; '),
+      language: outputLang
     });
 
     return result.experts.map((profile) => ({

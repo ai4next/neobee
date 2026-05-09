@@ -1,6 +1,6 @@
-import type { SessionRecord } from '@neobee/shared';
+import type { SessionRecord, ExpertProfile } from '@neobee/shared';
 import { StageController } from './stage-controller.js';
-import { ExpertCreationChain } from '../chains/expert-creation-chain.js';
+import { workerPool } from '../workers/worker-pool.js';
 
 export class ExpertCreationController extends StageController {
   protected async execute(session: SessionRecord): Promise<void> {
@@ -17,8 +17,10 @@ export class ExpertCreationController extends StageController {
     this.eventBus.emitRaw(session.id, 'experts.started', 'expert_creation', {});
     this.createTask(session.id);
 
-    const chain = new ExpertCreationChain();
-    const experts = await chain.run(session, aggregate.researchBrief);
+    const experts = await workerPool.execute<ExpertProfile[]>('expert_creation', {
+      session,
+      researchBrief: aggregate.researchBrief
+    });
 
     this.store.setExperts(session.id, experts);
     this.completeTask(session.id);

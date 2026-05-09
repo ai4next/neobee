@@ -42,7 +42,9 @@ export function useSessions(language: string) {
     activeSessionId: session?.session.id ?? null,
     onSessionState: (aggregate) => {
       setSession(aggregate);
-      setSelectedStage(aggregate.session.currentStage ?? 'topic_intake');
+      if (aggregate.session.currentStage) {
+        setSelectedStage(aggregate.session.currentStage);
+      }
       setSessions((previous) => mergeSessionList(previous, aggregate));
       if (aggregate.session.status === 'completed' || aggregate.session.status === 'failed') {
         setIsSubmitting(false);
@@ -105,6 +107,7 @@ export function useSessions(language: string) {
       const aggregate = await api.retrySession(session.session.id);
       setSession(aggregate);
       setSessions((previous) => mergeSessionList(previous, aggregate));
+      setIsSubmitting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Retry failed');
       setIsSubmitting(false);

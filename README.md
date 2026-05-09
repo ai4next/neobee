@@ -17,11 +17,6 @@
 - `apps/web`：Vite + React 前端
 - `apps/server`：Nest 风格的 Node.js/Express 后端
 - `packages/shared`：前后端共享的 TypeScript 类型定义
-- `docs`：架构与产品设计文档
-
-## 设计文档
-
-- [系统架构](./docs/ARCHITECTURE.md)
 
 ## 技术栈
 
@@ -141,8 +136,6 @@ npm run lint
 - `GET /api/sessions`：会话列表
 - `POST /api/sessions`：创建会话
 - `GET /api/sessions/:id/state`：会话完整状态
-- `GET /api/sessions/:id/graph`：会话图谱
-- `GET /api/sessions/:id/summary`：会话摘要
 - `GET /api/sessions/:id/export`：导出 Markdown
 - `POST /api/sessions/:id/run`：通过 HTTP 启动会话流程
 

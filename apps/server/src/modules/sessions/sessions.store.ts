@@ -46,7 +46,7 @@ export class SessionStore {
   private rowToAggregate(row: any, db: any): SessionAggregate {
     const briefRow = db.prepare('SELECT * FROM deep_research_data WHERE session_id = ?').get(row.id);
     const expertRows = db.prepare('SELECT id, session_id, name, domain, persona_style, stance, skills FROM expert_creation_data WHERE session_id = ?').all(row.id);
-    const insightRows = db.prepare('SELECT id, session_id, round_number, expert_id, insight, rationale, refs, links FROM insight_refinement_data WHERE session_id = ? ORDER BY round_number').all(row.id);
+    const insightRows = db.prepare('SELECT id, session_id, round_number, expert_id, insight, rationale FROM insight_refinement_data WHERE session_id = ? ORDER BY round_number').all(row.id);
     const reviewRows = db.prepare('SELECT * FROM cross_review_data WHERE session_id = ?').all(row.id);
     const ideaRows = db.prepare('SELECT * FROM idea_synthesis_data WHERE session_id = ?').all(row.id);
     const errorRow = db.prepare('SELECT * FROM session_error WHERE session_id = ?').get(row.id);
@@ -65,8 +65,6 @@ export class SessionStore {
         expertId: row.expert_id,
         insight: row.insight,
         rationale: row.rationale,
-        references: JSON.parse(row.refs),
-        links: JSON.parse(row.links)
       });
     }
     const rounds: SessionRound[] = Array.from(roundsMap.entries()).map(([key, insights]) => {
@@ -102,8 +100,8 @@ export class SessionStore {
         rounds: checkpointRow.rounds ? JSON.parse(checkpointRow.rounds) : [],
         reviews: checkpointRow.reviews ? JSON.parse(checkpointRow.reviews) : [],
         ideas: checkpointRow.ideas ? JSON.parse(checkpointRow.ideas) : [],
-        graph: checkpointRow.graph ? JSON.parse(checkpointRow.graph) : { nodes: [], edges: [] },
-        insightRefinementCursor: checkpointRow.insight_cursor ? JSON.parse(checkpointRow.insight_cursor) : null
+        insightRefinementCursor: checkpointRow.insight_cursor ? JSON.parse(checkpointRow.insight_cursor) : null,
+        crossReviewCursor: checkpointRow.cross_review_cursor ? JSON.parse(checkpointRow.cross_review_cursor) : null
       };
     }
 
@@ -138,14 +136,12 @@ export class SessionStore {
         evidenceStrength: rr.evidence_strength,
         crossDomainLeverage: rr.cross_domain_leverage,
         riskAwareness: rr.risk_awareness,
-        comment: rr.comment,
-        objectionLevel: rr.objection_level
+        comment: rr.comment
       })),
       ideas: ideaRows.map((ir: any) => ({
         id: ir.id,
         title: ir.title,
         thesis: ir.thesis,
-        supportingInsights: JSON.parse(ir.supporting_insights),
         whyNow: ir.why_now,
         targetUser: ir.target_user,
         coreMechanism: ir.core_mechanism,
@@ -153,8 +149,6 @@ export class SessionStore {
         totalScore: ir.total_score,
         controversyLabel: ir.controversy_label as any
       })),
-      graph: { nodes: [], edges: [] },
-      summary: null,
       errors: errorRow ? JSON.parse(errorRow.errors) : []
     };
 
@@ -185,8 +179,6 @@ export class SessionStore {
       rounds: [],
       reviews: [],
       ideas: [],
-      graph: { nodes: [], edges: [] },
-      summary: null,
       errors: []
     };
 
@@ -233,16 +225,9 @@ export class SessionStore {
         db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(sessionId);
       }
 
-      // Task and step tables (per-stage)
-      const stageTables = [
-        'topic_intake', 'deep_research', 'expert_creation', 'insight_refinement',
-        'cross_review', 'idea_synthesis'
-      ];
-      for (const stage of stageTables) {
-        // Steps reference tasks, delete them first
-        db.prepare(`DELETE FROM ${stage}_step WHERE task_id IN (SELECT id FROM ${stage}_task WHERE session_id = ?)`).run(sessionId);
-        db.prepare(`DELETE FROM ${stage}_task WHERE session_id = ?`).run(sessionId);
-      }
+      // Task and step tables (unified)
+      db.prepare('DELETE FROM stage_step WHERE task_id IN (SELECT id FROM stage_task WHERE session_id = ?)').run(sessionId);
+      db.prepare('DELETE FROM stage_task WHERE session_id = ?').run(sessionId);
 
       // Main session record
       db.prepare('DELETE FROM session WHERE id = ?').run(sessionId);
@@ -278,7 +263,7 @@ export class SessionStore {
     const db = getDb();
     db.prepare(`
       INSERT OR REPLACE INTO session_checkpoint
-        (session_id, completed_stages, current_stage, stage_progress, research_brief, experts, rounds, reviews, ideas, graph, insight_cursor)
+        (session_id, completed_stages, current_stage, stage_progress, research_brief, experts, rounds, reviews, ideas, insight_cursor, cross_review_cursor)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sessionId,
@@ -290,8 +275,8 @@ export class SessionStore {
       checkpoint.rounds.length > 0 ? JSON.stringify(checkpoint.rounds) : null,
       checkpoint.reviews.length > 0 ? JSON.stringify(checkpoint.reviews) : null,
       checkpoint.ideas.length > 0 ? JSON.stringify(checkpoint.ideas) : null,
-      JSON.stringify(checkpoint.graph),
-      checkpoint.insightRefinementCursor ? JSON.stringify(checkpoint.insightRefinementCursor) : null
+      checkpoint.insightRefinementCursor ? JSON.stringify(checkpoint.insightRefinementCursor) : null,
+      checkpoint.crossReviewCursor ? JSON.stringify(checkpoint.crossReviewCursor) : null
     );
 
     const aggregate = this.require(sessionId);
@@ -413,14 +398,13 @@ export class SessionStore {
     const db = getDb();
     db.prepare('DELETE FROM insight_refinement_data WHERE session_id = ?').run(sessionId);
     const insert = db.prepare(
-      `INSERT INTO insight_refinement_data (session_id, round_number, expert_id, insight, rationale, refs, links)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO insight_refinement_data (session_id, round_number, expert_id, insight, rationale)
+       VALUES (?, ?, ?, ?, ?)`
     );
     for (const round of rounds) {
       for (const insight of round.insights) {
         insert.run(
-          sessionId, round.round, insight.expertId, insight.insight, insight.rationale,
-          JSON.stringify(insight.references), JSON.stringify(insight.links)
+          sessionId, round.round, insight.expertId, insight.insight, insight.rationale
         );
       }
     }
@@ -434,14 +418,14 @@ export class SessionStore {
     aggregate.session.updatedAt = new Date().toISOString();
     const db = getDb();
     const insert = db.prepare(
-      `INSERT INTO cross_review_data (id, session_id, insight_id, reviewer_expert_id, novelty, usefulness, feasibility, evidence_strength, cross_domain_leverage, risk_awareness, comment, objection_level)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO cross_review_data (id, session_id, insight_id, reviewer_expert_id, novelty, usefulness, feasibility, evidence_strength, cross_domain_leverage, risk_awareness, comment)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const r of reviews) {
       insert.run(
         crypto.randomUUID(), sessionId, r.insightId, r.reviewerExpertId,
         r.novelty, r.usefulness, r.feasibility, r.evidenceStrength,
-        r.crossDomainLeverage, r.riskAwareness, r.comment, r.objectionLevel
+        r.crossDomainLeverage, r.riskAwareness, r.comment
       );
     }
     this.persistSession(aggregate);
@@ -454,12 +438,12 @@ export class SessionStore {
     aggregate.session.updatedAt = new Date().toISOString();
     const db = getDb();
     const insert = db.prepare(
-      `INSERT INTO idea_synthesis_data (id, session_id, title, thesis, supporting_insights, why_now, target_user, core_mechanism, risks, total_score, controversy_label)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO idea_synthesis_data (id, session_id, title, thesis, why_now, target_user, core_mechanism, risks, total_score, controversy_label)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const idea of ideas) {
       insert.run(
-        idea.id, sessionId, idea.title, idea.thesis, JSON.stringify(idea.supportingInsights),
+        idea.id, sessionId, idea.title, idea.thesis,
         idea.whyNow, idea.targetUser, idea.coreMechanism, JSON.stringify(idea.risks),
         idea.totalScore, idea.controversyLabel ?? null
       );

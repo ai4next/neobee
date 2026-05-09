@@ -32,6 +32,9 @@
 
 .nb-panel.right {
   flex: 8;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .nb-panel.collapsed {
@@ -231,13 +234,14 @@
 }
 
 .nb-workbench {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
   background: transparent;
   border: none;
   box-shadow: none;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
   padding-right: 4px;
 }
 
@@ -306,6 +310,22 @@
   font-size: 1rem;
 }
 
+.nb-error-banner {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+}
+.nb-error-message {
+  font-size: 0.84rem;
+  color: var(--risk);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .nb-retry-banner {
   display: flex;
   align-items: center;
@@ -353,10 +373,30 @@
   background: rgba(0, 0, 0, 0.25);
 }
 
+.nb-stage-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nb-stage-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nb-stage-card::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.nb-stage-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
 .nb-stage-card {
   padding: 18px;
   will-change: transform, opacity, border-color;
   transition: border-color var(--transition-fast), background var(--transition-fast);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .nb-stage-card.mini {

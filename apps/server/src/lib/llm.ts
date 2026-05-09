@@ -1,7 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
-import fs from 'fs';
-import path from 'path';
+import { getConfig as getCachedConfig } from './config-cache.js';
 
 export type LLMProvider = 'openai' | 'anthropic' | 'openrouter';
 
@@ -14,32 +13,11 @@ export interface StageProvider {
   baseURL?: string;
 }
 
-export interface Config {
-  providers: StageProvider[];
-}
-
-let config: Config | null = null;
 let llmCache: Map<string, ChatOpenAI | ChatAnthropic> = new Map();
 
-export function getConfig(): Config {
-  if (config) {
-    return config;
-  }
-
-  const configPath = path.join(process.env.HOME || '', '.neobee', 'neobee.json');
-  if (fs.existsSync(configPath)) {
-    const content = fs.readFileSync(configPath, 'utf-8');
-    config = JSON.parse(content);
-    return config!;
-  }
-
-  config = { providers: [] };
-  return config;
-}
-
 export function getProviderConfig(stage: string = 'default'): StageProvider | undefined {
-  const cfg = getConfig();
-  return cfg.providers.find((p) => p.stage === stage) || cfg.providers.find((p) => p.stage === 'default');
+  const cfg = getCachedConfig();
+  return (cfg.providers || []).find((p) => p.stage === stage) || (cfg.providers || []).find((p) => p.stage === 'default');
 }
 
 export function getLanguageParam(session: { language?: string }): string {
@@ -87,8 +65,4 @@ export function getLLM(stage: string = 'default'): ChatOpenAI | ChatAnthropic {
 
   llmCache.set(cacheKey, llm);
   return llm;
-}
-
-export function clearLLMCache(): void {
-  llmCache.clear();
 }

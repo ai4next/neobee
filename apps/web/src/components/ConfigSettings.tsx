@@ -30,9 +30,15 @@ const PROVIDER_OPTIONS = [
   { id: 'openrouter', name: 'OpenRouter' }
 ];
 
-export function ConfigSettings() {
+interface ConfigSettingsProps {
+  onClose?: () => void;
+}
+
+export function ConfigSettings({ onClose }: ConfigSettingsProps) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<Config>({ providers: [] });
+  const [searchProvider, setSearchProvider] = useState('duckduckgo');
+  const [searchApiKey, setSearchApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -52,6 +58,8 @@ export function ConfigSettings() {
         } else {
           setConfig({ providers: [{ stage: 'default', provider: 'anthropic', apiKey: '', model: 'claude-sonnet-4-7', temperature: 0.7, baseURL: '' }] });
         }
+        setSearchProvider(data.searchProvider || 'duckduckgo');
+        setSearchApiKey(data.searchApiKey || '');
       }
     } catch (err) {
       console.error('Failed to load config:', err);
@@ -67,7 +75,7 @@ export function ConfigSettings() {
       const res = await fetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
+        body: JSON.stringify({ ...config, searchProvider, searchApiKey })
       });
       if (res.ok) {
         setMessage({ type: 'success', text: 'Config saved successfully' });
@@ -118,7 +126,6 @@ export function ConfigSettings() {
   return (
     <div className="nb-system-config">
       <div className="nb-config-header">
-        <h3>{t('modelConfig') || 'Model Configuration'}</h3>
         <div className="nb-config-actions">
           <button className="nb-config-btn secondary" onClick={loadConfig} disabled={loading}>
             {loading ? t('loading') || 'Loading...' : t('load') || 'Load'}
@@ -127,6 +134,14 @@ export function ConfigSettings() {
             {saving ? t('saving') || 'Saving...' : t('save') || 'Save'}
           </button>
         </div>
+        {onClose && (
+          <button className="nb-config-close" onClick={onClose}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {message && (
@@ -138,6 +153,7 @@ export function ConfigSettings() {
           const availableStages = getAvailableStages(index);
           return (
             <div key={index} className="nb-config-provider">
+              <h4>{t('modelConfig') || 'Model Configuration'}</h4>
               <div className="nb-provider-header">
                 <select
                   value={provider.stage}
@@ -213,6 +229,43 @@ export function ConfigSettings() {
           + {t('addProvider') || 'Add Stage Config'}
         </button>
       )}
+
+      {/* Search Engine Configuration */}
+      <div className="nb-search-section">
+        <h4>{t('searchEngine') || 'Search Engine'}</h4>
+
+        <div className="nb-search-controls">
+          <select
+            value={searchProvider}
+            onChange={(e) => setSearchProvider(e.target.value)}
+            className="nb-provider-select"
+          >
+            <option value="duckduckgo">{t('duckduckgo') || 'DuckDuckGo'}</option>
+            <option value="tavily">{t('tavily') || 'Tavily'}</option>
+            <option value="llm">{t('llm') || 'LLM (LLM-based)'}</option>
+          </select>
+        </div>
+
+        {searchProvider === 'tavily' && (
+          <div className="nb-search-apikey">
+            <label className="nb-field">
+              <span>{t('apiKey') || 'API Key'}</span>
+              <input
+                type="password"
+                value={searchApiKey}
+                onChange={(e) => setSearchApiKey(e.target.value)}
+                placeholder={t('tavilyApiKeyPlaceholder') || 'Enter your Tavily API key'}
+              />
+            </label>
+          </div>
+        )}
+
+        {searchProvider === 'tavily' && (
+          <p className="nb-search-hint">
+            {t('tavilyHint') || 'The API key will be saved to config and used for search requests'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -21,8 +21,6 @@ export function useSessionWebSocket({
   onError
 }: UseSessionWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
   const activeSessionRef = useRef<string | null>(activeSessionId);
   const handlersRef = useRef({
     onSessionState,
@@ -65,7 +63,6 @@ export function useSessionWebSocket({
       wsRef.current = socket;
 
       socket.onopen = () => {
-        reconnectAttempts.current = 0;
         subscribe();
       };
 
@@ -95,17 +92,15 @@ export function useSessionWebSocket({
       };
 
       socket.onerror = () => {
-        handlersRef.current.onError('WebSocket connection error');
+        console.warn('WebSocket connection error');
       };
 
       socket.onclose = () => {
         wsRef.current = null;
-        if (reconnectAttempts.current >= maxReconnectAttempts) {
-          return;
-        }
 
-        const delay = Math.min(1000 * 2 ** reconnectAttempts.current, 30000);
-        reconnectAttempts.current += 1;
+        const baseDelay = Math.min(1000 * 2 ** 0, 30000);
+        const jitter = Math.random() * 1000;
+        const delay = baseDelay + jitter;
         reconnectTimer = window.setTimeout(() => {
           connect();
         }, delay);

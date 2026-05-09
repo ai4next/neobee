@@ -5,6 +5,7 @@ type EventRecorder = (event: SessionEvent<any>) => void;
 
 export class EventBus {
   private readonly listeners = new Map<string, Set<EventListener>>();
+  private readonly globalListeners = new Set<EventListener>();
   private recorder: EventRecorder | null = null;
 
   setRecorder(recorder: EventRecorder): void {
@@ -12,6 +13,10 @@ export class EventBus {
   }
 
   subscribe(sessionId: string, listener: EventListener): () => void {
+    if (sessionId === '*') {
+      this.globalListeners.add(listener);
+      return () => this.globalListeners.delete(listener);
+    }
     if (!this.listeners.has(sessionId)) {
       this.listeners.set(sessionId, new Set());
     }
@@ -26,16 +31,24 @@ export class EventBus {
   emit(event: SessionEvent<any>): void {
     this.recorder?.(event);
 
+    // Notify session-specific listeners
     const listeners = this.listeners.get(event.sessionId);
-    if (!listeners) {
-      return;
+    if (listeners) {
+      for (const listener of listeners) {
+        try {
+          listener(event);
+        } catch (err) {
+          console.error(`Event listener error for session ${event.sessionId}:`, err);
+        }
+      }
     }
 
-    for (const listener of listeners) {
+    // Notify global listeners
+    for (const listener of this.globalListeners) {
       try {
         listener(event);
       } catch (err) {
-        console.error(`Event listener error for session ${event.sessionId}:`, err);
+        console.error('Global event listener error:', err);
       }
     }
   }
