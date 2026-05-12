@@ -1,11 +1,34 @@
-node_modules
-.next
-dist
-coverage
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data (SQLite DB)
+data/
+
+# Environment
 .env
-.env.local
-npm-debug.log*
-__pycache__
-*.pyc
-.venv
-.pytest_cache
+
+# Streamlit
+.streamlit/
+
+# uv lockfile
+uv.lock
