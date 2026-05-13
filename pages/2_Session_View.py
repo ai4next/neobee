@@ -143,28 +143,13 @@ with bcol:
             st.rerun()
 
     elif current_session.status == SessionStatus.FAILED:
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button(T("🔄 Retry", "🔄 重试"), width='stretch'):
-                current_stage = current_session.current_stage.value if current_session.current_stage else "deep_research"
-                db_module.clear_stage_data(sid, current_stage)
-                current_session.status = SessionStatus.RESEARCHING
-                db_module.update_session(current_session)
-                orchestrator.start_session_sync(sid, current_session)
-                st.rerun()
-        with c2:
-            if st.button(T("🗑 Delete", "🗑 删除"), width='stretch'):
-                db_module.delete_session(sid)
-                st.session_state.session_id = None
-                st.session_state.view = "new"
-                st.switch_page("pages/1_New_Session.py")
-
-    elif current_session.status == SessionStatus.COMPLETED:
-        if st.button(T("🗑 Delete", "🗑 删除"), width='stretch'):
-            db_module.delete_session(sid)
-            st.session_state.session_id = None
-            st.session_state.view = "new"
-            st.switch_page("pages/1_New_Session.py")
+        if st.button(T("🔄 Retry", "🔄 重试"), width='stretch'):
+            current_stage = current_session.current_stage.value if current_session.current_stage else "deep_research"
+            db_module.clear_stage_data(sid, current_stage)
+            current_session.status = SessionStatus.RESEARCHING
+            db_module.update_session(current_session)
+            orchestrator.start_session_sync(sid, current_session)
+            st.rerun()
 
 with tcol:
     agg = db_module.get_aggregate(sid)
