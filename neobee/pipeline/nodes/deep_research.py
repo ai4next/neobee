@@ -13,6 +13,7 @@ from neobee.models import (
     ResearchBrief,
     SynthesisOutput,
 )
+from neobee.pipeline.nodes.opportunity_map import generate_opportunity_map
 from neobee.pipeline.state import NeobeeState
 
 from neobee.pipeline._registry import _get_tracker
@@ -148,8 +149,15 @@ async def deep_research_node(state: NeobeeState) -> dict:
             source_refs=synthesis.source_refs,
         )
 
+        # Sub-stage 6: Opportunity Map generation (best-effort)
+        _progress(90, "generating opportunity map")
+        opp_map = await generate_opportunity_map(brief, language)
+
         _progress(100, "completed")
-        return {"research_brief": brief, "error": None}
+        result = {"research_brief": brief, "error": None}
+        if opp_map:
+            result["opportunity_map"] = opp_map
+        return result
 
     except Exception as e:
         return {"research_brief": None, "error": str(e)}
