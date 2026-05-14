@@ -113,6 +113,19 @@ class ResearchBrief(BaseModel):
     source_refs: list[str] = Field(default_factory=list)
 
 
+class OpportunityArea(BaseModel):
+    name: str
+    description: str
+    pain_points: list[str] = Field(default_factory=list)
+    tech_trends: list[str] = Field(default_factory=list)
+    market_signals: list[str] = Field(default_factory=list)
+
+
+class OpportunityMap(BaseModel):
+    areas: list[OpportunityArea] = Field(default_factory=list)
+    cross_area_synergies: list[str] = Field(default_factory=list)
+
+
 class ExpertProfile(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     name: str
@@ -120,6 +133,7 @@ class ExpertProfile(BaseModel):
     persona_style: str
     stance: str
     skills: list[str] = Field(default_factory=list)
+    opportunity_area: str = ""
 
 
 class Insight(BaseModel):
@@ -160,6 +174,24 @@ class IdeaCandidate(BaseModel):
     controversy_label: Optional[str] = None
 
 
+class RawIdea(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    title: str
+    thesis: str
+    core_mechanism: str
+
+
+class IdeaEvaluation(BaseModel):
+    idea_id: str
+    novelty: int = Field(..., ge=1, le=10)
+    feasibility: int = Field(..., ge=1, le=10)
+    market_potential: int = Field(..., ge=1, le=10)
+    differentiation: int = Field(..., ge=1, le=10)
+    insight_alignment: int = Field(..., ge=1, le=10)
+    total_score: float = 0.0
+    controversy_label: Optional[str] = None  # "consensus" | "controversial" | "niche"
+
+
 # ── Checkpoint / Cursor models ───────────────────────────────────────────────
 
 class InsightRefinementCursor(BaseModel):
@@ -176,6 +208,7 @@ class SessionCheckpoint(BaseModel):
     current_stage: Optional[str] = None
     stage_progress: int = 0
     research_brief: Optional[ResearchBrief] = None
+    opportunity_map: Optional[OpportunityMap] = None
     experts: list[ExpertProfile] = Field(default_factory=list)
     rounds: list[SessionRound] = Field(default_factory=list)
     reviews: list[ReviewScore] = Field(default_factory=list)
