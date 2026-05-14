@@ -5,6 +5,7 @@ from typing import Optional, TypedDict
 from neobee.models import (
     ExpertProfile,
     IdeaCandidate,
+    OpportunityMap,
     ResearchBrief,
     ReviewScore,
     SessionRecord,
@@ -16,6 +17,7 @@ class NeobeeState(TypedDict):
     """LangGraph state for the NeoBee brainstorming pipeline."""
     session: SessionRecord
     research_brief: Optional[ResearchBrief]
+    opportunity_map: Optional[OpportunityMap]
     experts: list[ExpertProfile]
     rounds: list[SessionRound]
     reviews: list[ReviewScore]
@@ -31,6 +33,7 @@ def make_initial_state(session: SessionRecord) -> NeobeeState:
     return {
         "session": session,
         "research_brief": None,
+        "opportunity_map": None,
         "experts": [],
         "rounds": [],
         "reviews": [],
