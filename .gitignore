@@ -32,3 +32,6 @@ data/
 
 # uv lockfile
 uv.lock
+
+# docs
+docs/
