@@ -107,6 +107,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             persona_style TEXT NOT NULL,
             stance TEXT NOT NULL,
             skills TEXT NOT NULL DEFAULT '[]',
+            opportunity_area TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (session_id) REFERENCES session(id) ON DELETE CASCADE
         );
 
@@ -326,9 +327,9 @@ def upsert_experts(session_id: str, experts: list) -> None:
     conn.execute("DELETE FROM expert_creation_data WHERE session_id = ?", (session_id,))
     for exp in experts:
         conn.execute(
-            "INSERT INTO expert_creation_data (session_id, name, domain, persona_style, stance, skills) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO expert_creation_data (session_id, name, domain, persona_style, stance, skills, opportunity_area) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (session_id, exp.name, exp.domain, exp.persona_style, exp.stance,
-             json.dumps(exp.skills, ensure_ascii=False)),
+             json.dumps(exp.skills, ensure_ascii=False), exp.opportunity_area or ""),
         )
     conn.commit()
 
@@ -340,6 +341,7 @@ def get_experts(session_id: str) -> list:
         ExpertProfile(
             name=r["name"], domain=r["domain"], persona_style=r["persona_style"],
             stance=r["stance"], skills=json.loads(r["skills"]),
+            opportunity_area=r["opportunity_area"] or "",
         ) for r in rows
     ]
 
@@ -457,9 +459,9 @@ def save_checkpoint(session_id: str, cp: SessionCheckpoint) -> None:
             insight_cursor, cross_review_cursor)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (session_id,
-         json.dumps(cp.completed_stages, ensure_ascii=False),
+         '[]',
          cp.current_stage,
-         cp.stage_progress,
+         0,
          json.dumps(cp.research_brief.model_dump(mode="json"), ensure_ascii=False) if cp.research_brief else None,
          json.dumps([e.model_dump(mode="json") for e in cp.experts], ensure_ascii=False) if cp.experts else None,
          json.dumps([r.model_dump(mode="json") for r in cp.rounds], ensure_ascii=False) if cp.rounds else None,
@@ -478,9 +480,7 @@ def get_checkpoint(session_id: str) -> Optional[SessionCheckpoint]:
     if not row:
         return None
     return SessionCheckpoint(
-        completed_stages=json.loads(row["completed_stages"]) if row["completed_stages"] else [],
         current_stage=row["current_stage"],
-        stage_progress=row["stage_progress"],
         research_brief=ResearchBrief(**json.loads(row["research_brief"])) if row["research_brief"] else None,
         experts=[ExpertProfile(**e) for e in json.loads(row["experts"])] if row["experts"] else [],
         rounds=[SessionRound(**r) for r in json.loads(row["rounds"])] if row["rounds"] else [],

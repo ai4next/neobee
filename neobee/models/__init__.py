@@ -36,15 +36,6 @@ class StageRunStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
-    SKIPPED = "skipped"
-
-
-class ResearchProgressStage(str, Enum):
-    INITIALIZING = "initializing"
-    ANALYZING = "analyzing"
-    GATHERING_FACTS = "gathering_facts"
-    IDENTIFYING_QUESTIONS = "identifying_questions"
-    SYNTHESIZING = "synthesizing"
 
 
 class SessionEventType(str, Enum):
@@ -62,13 +53,7 @@ class SessionEventType(str, Enum):
     REVIEW_COMPLETED = "review.completed"
     IDEA_SYNTHESIS_STARTED = "idea_synthesis.started"
     IDEA_GENERATED = "idea.generated"
-    ROUND_STARTED = "round.started"
-    INSIGHT_CREATED = "insight.created"
-    ROUND_COMPLETED = "round.completed"
     RUN_FAILED = "run.failed"
-    TASK_STARTED = "task.started"
-    TASK_PROGRESS = "task.progress"
-    TASK_COMPLETED = "task.completed"
 
 
 # ── Input / Record models ────────────────────────────────────────────────────
@@ -98,12 +83,6 @@ class SessionRecord(BaseModel):
 
 
 # ── Pipeline stage data models ───────────────────────────────────────────────
-
-class ResearchProgress(BaseModel):
-    stage: ResearchProgressStage
-    message: str
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
 
 class ResearchBrief(BaseModel):
     topic_frame: str
@@ -204,9 +183,7 @@ class CrossReviewCursor(BaseModel):
 
 
 class SessionCheckpoint(BaseModel):
-    completed_stages: list[str] = Field(default_factory=list)
     current_stage: Optional[str] = None
-    stage_progress: int = 0
     research_brief: Optional[ResearchBrief] = None
     opportunity_map: Optional[OpportunityMap] = None
     experts: list[ExpertProfile] = Field(default_factory=list)
@@ -225,7 +202,6 @@ class TaskProgressPayload(BaseModel):
     progress: int = 0
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     error: Optional[str] = None
-    current_step: Optional[dict] = None
 
 
 T = TypeVar("T")
@@ -246,7 +222,6 @@ class SessionAggregate(BaseModel):
     session: SessionRecord
     checkpoint: Optional[SessionCheckpoint] = None
     research_brief: Optional[ResearchBrief] = None
-    research_progress: list[ResearchProgress] = Field(default_factory=list)
     experts: list[ExpertProfile] = Field(default_factory=list)
     rounds: list[SessionRound] = Field(default_factory=list)
     reviews: list[ReviewScore] = Field(default_factory=list)
@@ -259,13 +234,11 @@ class SessionAggregate(BaseModel):
 class QueryGenOutput(BaseModel):
     primary_query: str = Field(description="Main search query")
     sub_queries: list[str] = Field(description="Supporting sub-queries", default_factory=list)
-    search_strategy: str = Field(description="Strategy for searching", default="")
 
 
 class FactExtractionOutput(BaseModel):
     facts: list[str] = Field(description="Verifiable facts extracted from search results")
     knowledge_gaps: list[str] = Field(description="Identified knowledge gaps")
-    key_entities: list[str] = Field(description="Key entities or concepts mentioned")
 
 
 class SynthesisOutput(BaseModel):
