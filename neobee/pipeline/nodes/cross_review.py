@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
-from neobee.models import Insight, ReviewBatchOutput, ReviewScore, SessionRound
+from neobee.models import ExpertProfile, Insight, ReviewBatchOutput
+from neobee.pipeline._registry import _get_tracker
+from neobee.pipeline._utils import _retry_llm
 from neobee.pipeline.state import NeobeeState
 
 PROMPT = ChatPromptTemplate.from_messages([
@@ -20,10 +20,12 @@ PROMPT = ChatPromptTemplate.from_messages([
      "- risk_awareness: Does it show awareness of risks?\n\n"
      "Reviewer's expertise: {reviewer_domain}\nReviewer's style: {reviewer_style}"),
     ("human", "Review the following insights:\n\n{insights_text}\n\n"
-     "Provide scores and comments for each insight.\n\n{format_instructions}"),
+     "Provide scores and comments for each insight.\n\n"
+     "Use {language}\n\n{format_instructions}"),
 ])
 
-BATCH_SIZE = 20
+BATCH_SIZE = 30
+GROUP_SIZE = 5
 
 
 def _format_insights_for_review(insights: list[Insight]) -> str:
@@ -34,78 +36,139 @@ def _format_insights_for_review(insights: list[Insight]) -> str:
     )
 
 
+def _group_experts(
+    experts: list[ExpertProfile],
+    group_size: int = GROUP_SIZE,
+) -> list[list[ExpertProfile]]:
+    """Divide experts into balanced groups deterministically.
+
+    Groups are sized so that the largest and smallest group differ
+    by at most 1 expert.  Number of groups is derived from total
+    expert count and target group_size.
+    """
+    sorted_experts = sorted(experts, key=lambda e: e.id)
+    n = len(sorted_experts)
+    if n == 0:
+        return []
+
+    num_groups = max(1, (n + group_size - 1) // group_size)  # ceiling division
+    base_size = n // num_groups
+    remainder = n % num_groups
+
+    groups: list[list[ExpertProfile]] = []
+    idx = 0
+    for i in range(num_groups):
+        size = base_size + (1 if i < remainder else 0)
+        groups.append(sorted_experts[idx:idx + size])
+        idx += size
+
+    return groups
+
+
+def _get_group_insights_for_reviewer(
+    reviewer_id: str,
+    group: list[ExpertProfile],
+    expert_insights: dict[str, list[Insight]],
+) -> list[Insight]:
+    """Collect all insights from group members except the reviewer."""
+    insights: list[Insight] = []
+    for expert in group:
+        if expert.id != reviewer_id:
+            insights.extend(expert_insights.get(expert.id, []))
+    return insights
+
+
 async def cross_review_node(state: NeobeeState) -> dict:
-    """Each expert reviews all insights with 6-dimension scores."""
-    print("===== Cross Review Node =====")
+    """Group-based cross review with full coverage within each group.
+
+    Experts are divided into balanced groups (GROUP_SIZE={}). Within
+    each group, every expert reviews ALL insights from every other
+    group member, guaranteeing complete coverage.
+    """.format(GROUP_SIZE)
+    print("===== Cross Review Node (group-based) =====")
+    session = state["session"]
     experts = state.get("experts", [])
     rounds = state.get("rounds", [])
     cursor = state.get("cross_review_cursor") or {"completed_expert_ids": []}
+    tracker = _get_tracker()
+    task_id = state.get("task_id")
 
     if not experts or not rounds:
         return {"error": "Experts and rounds required for cross review"}
 
-    all_insights: list[Insight] = []
-    for sr in rounds:
-        all_insights.extend(sr.insights)
+    def _progress(pct: int, step: str) -> None:
+        if tracker and task_id:
+            tracker.update_progress(session.id, "cross_review", task_id, pct, step)
 
-    if not all_insights:
+    # Build lookup: expert_id -> list of their insights across all rounds
+    expert_insights: dict[str, list[Insight]] = {}
+    for sr in rounds:
+        for ins in sr.insights:
+            expert_insights.setdefault(ins.expert_id, []).append(ins)
+
+    if not expert_insights:
         return {"error": "No insights to review"}
 
     all_reviews = list(state.get("reviews", []))
     completed_ids = set(cursor.get("completed_expert_ids", []))
+    total_experts = len(experts)
 
     try:
-        for expert in experts:
-            if expert.id in completed_ids:
+        groups = _group_experts(experts)
+        reviewed_count = len(completed_ids)
+        language = "English" if session.language == "en" else "Chinese"
+        _progress(5, "starting grouped cross review")
+
+        for group in groups:
+            if len(group) < 2:
+                for expert in group:
+                    completed_ids.add(expert.id)
+                reviewed_count += len(group)
                 continue
 
-            for batch_start in range(0, len(all_insights), BATCH_SIZE):
-                batch = all_insights[batch_start:batch_start + BATCH_SIZE]
-                insights_text = _format_insights_for_review(batch)
+            for reviewer in group:
+                if reviewer.id in completed_ids:
+                    continue
+
+                to_review = _get_group_insights_for_reviewer(
+                    reviewer.id, group, expert_insights,
+                )
+                if not to_review:
+                    reviewed_count += 1
+                    completed_ids.add(reviewer.id)
+                    continue
 
                 parser = PydanticOutputParser(pydantic_object=ReviewBatchOutput)
                 llm = get_llm("cross_review")
-                retries = 2
-                batch_reviews = []
-                for attempt in range(retries + 1):
-                    try:
-                        messages = PROMPT.format_messages(
-                            reviewer_domain=expert.domain,
-                            reviewer_style=expert.persona_style,
-                            insights_text=insights_text,
-                            format_instructions=parser.get_format_instructions(),
-                        )
-                        result = await llm.ainvoke(messages)
-                        parsed = parser.parse(result.content)
-                        batch_reviews = parsed.reviews
-                        break
-                    except Exception:
-                        if attempt < retries:
-                            await asyncio.sleep(2 ** attempt)
-                        else:
-                            raise
 
-                for i, rev in enumerate(batch_reviews):
-                    if i < len(batch):
-                        rev.insight_id = batch[i].id
-                    rev.reviewer_expert_id = expert.id
+                for batch_start in range(0, len(to_review), BATCH_SIZE):
+                    batch = to_review[batch_start:batch_start + BATCH_SIZE]
+                    insights_text = _format_insights_for_review(batch)
 
-                all_reviews.extend(batch_reviews)
+                    messages = PROMPT.format_messages(
+                        reviewer_domain=reviewer.domain,
+                        reviewer_style=reviewer.persona_style,
+                        insights_text=insights_text,
+                        language=language,
+                        format_instructions=parser.get_format_instructions(),
+                    )
+                    result = await _retry_llm(llm.ainvoke(messages))
+                    parsed = parser.parse(result.content)
 
-            completed_ids.add(expert.id)
+                    for i, rev in enumerate(parsed.reviews):
+                        if i < len(batch):
+                            rev.insight_id = batch[i].id
+                        rev.reviewer_expert_id = reviewer.id
 
+                    all_reviews.extend(parsed.reviews)
+
+                reviewed_count += 1
+                completed_ids.add(reviewer.id)
+                pct = 10 + int(90 * reviewed_count / total_experts)
+                _progress(pct, f"reviewed {reviewed_count}/{total_experts} experts")
+
+        _progress(100, "completed")
         return {"reviews": all_reviews, "cross_review_cursor": None, "error": None}
 
     except Exception as e:
         return {"error": str(e)}
-
-
-def aggregate_scores(reviews: list[ReviewScore]) -> dict[str, float]:
-    scores: dict[str, list[float]] = {}
-    for rev in reviews:
-        total = (rev.novelty + rev.usefulness + rev.feasibility +
-                 rev.evidence_strength + rev.cross_domain_leverage + rev.risk_awareness)
-        if rev.insight_id not in scores:
-            scores[rev.insight_id] = []
-        scores[rev.insight_id].append(total)
-    return {insight_id: sum(v) / len(v) for insight_id, v in scores.items()}

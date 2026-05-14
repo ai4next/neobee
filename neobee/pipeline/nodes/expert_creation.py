@@ -4,48 +4,96 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
-from neobee.models import ExpertsOutput
+from neobee.models import ExpertProfile, ExpertsOutput
+from neobee.pipeline._registry import _get_tracker
 from neobee.pipeline.state import NeobeeState
 
-PROMPT = ChatPromptTemplate.from_messages([
+BATCH_SIZE = 25
+
+PROMPT_SINGLE_BATCH = ChatPromptTemplate.from_messages([
     ("system", "You are a talent scout for innovation think-tanks. Given a research topic, "
-     "generate {expert_count} diverse expert personas who would provide valuable perspectives. "
-     "Each expert should have a unique domain, persona style, and stance."),
+     "generate {batch_count} diverse expert personas who would provide valuable perspectives. "
+     "Each expert should have a unique domain, persona style, and stance. "
+     "Generate distinct personas that complement the ones already generated: {existing_summary}"),
     ("human", "Research Topic: {topic}\n\n"
      "Topic Frame: {topic_frame}\n\n"
      "Open Questions: {open_questions}\n\n"
-     "Generate {expert_count} expert personas with diverse perspectives.\n\n{format_instructions}"),
+     "Generate {batch_count} additional expert personas. "
+     "They must be DIFFERENT from the existing ones — cover new domains, perspectives, and stances.\n\n"
+     "Use {language}\n\n{format_instructions}"),
 ])
 
 
 async def expert_creation_node(state: NeobeeState) -> dict:
-    """Generate expert personas from the research brief."""
-    print("★★★★★ EXPERT CREATION ★★★★★")
+    """Generate expert personas from the research brief, with batching for large counts."""
+    print("===== EXPERT CREATION NODE =====")
     session = state["session"]
+    language = "English" if session.language == "en" else "Chinese"
     brief = state.get("research_brief")
+    tracker = _get_tracker()
+    task_id = state.get("task_id")
 
     if not brief:
         return {"error": "Research brief is required for expert creation", "experts": []}
 
+    def _progress(pct: int, step: str) -> None:
+        if tracker and task_id:
+            tracker.update_progress(session.id, "expert_creation", task_id, pct, step)
+
     try:
+        total_needed = session.expert_count
         parser = PydanticOutputParser(pydantic_object=ExpertsOutput)
         llm = get_llm("expert_creation")
-        messages = PROMPT.format_messages(
-            expert_count=str(session.expert_count),
-            topic=session.topic,
-            topic_frame=brief.topic_frame,
-            open_questions="\n".join(brief.open_questions) if brief.open_questions else "None yet",
-            format_instructions=parser.get_format_instructions(),
-        )
-        result = await llm.ainvoke(messages)
-        parsed = parser.parse(result.content)
+        all_experts: list[ExpertProfile] = []
 
-        for expert in parsed.experts:
-            if not expert.id:
-                import uuid
-                expert.id = uuid.uuid4().hex
+        _progress(5, "generating expert personas")
 
-        return {"experts": parsed.experts, "error": None}
+        num_batches = (total_needed + BATCH_SIZE - 1) // BATCH_SIZE
+        batch_sizes = [min(BATCH_SIZE, total_needed - i * BATCH_SIZE) for i in range(num_batches)]
+
+        for batch_idx, batch_count in enumerate(batch_sizes):
+            if batch_idx == 0:
+                # First batch — use original prompt (no existing context)
+                messages = PROMPT_SINGLE_BATCH.format_messages(
+                    batch_count=str(batch_count),
+                    topic=session.topic,
+                    topic_frame=brief.topic_frame,
+                    open_questions="\n".join(brief.open_questions) if brief.open_questions else "None yet",
+                    existing_summary="None — this is the first batch",
+                    language=language,
+                    format_instructions=parser.get_format_instructions(),
+                )
+            else:
+                domains = ", ".join(e.domain for e in all_experts[-BATCH_SIZE:])
+                messages = PROMPT_SINGLE_BATCH.format_messages(
+                    batch_count=str(batch_count),
+                    topic=session.topic,
+                    topic_frame=brief.topic_frame,
+                    open_questions="\n".join(brief.open_questions) if brief.open_questions else "None yet",
+                    existing_summary=domains,
+                    language=language,
+                    format_instructions=parser.get_format_instructions(),
+                )
+
+            result = await llm.ainvoke(messages)
+            parsed = parser.parse(result.content)
+            all_experts.extend(parsed.experts)
+
+            # Ensure all experts have IDs
+            for expert in parsed.experts:
+                if not expert.id:
+                    import uuid
+                    expert.id = uuid.uuid4().hex
+
+            pct = 10 + int(85 * (batch_idx + 1) / num_batches)
+            _progress(pct, f"generated batch {batch_idx + 1}/{num_batches}")
+
+        # Trim to exact count requested
+        all_experts = all_experts[:total_needed]
+
+        _progress(100, "completed")
+        return {"experts": all_experts, "error": None}
 
     except Exception as e:
+        _progress(0, "failed")
         return {"experts": [], "error": str(e)}

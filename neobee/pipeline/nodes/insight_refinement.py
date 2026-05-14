@@ -11,16 +11,19 @@ from neobee.pipeline.state import NeobeeState
 
 from neobee.pipeline._registry import _get_tracker
 
+MAX_CONCURRENT_LLM = 20
+_semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM)
+
 PROMPT = ChatPromptTemplate.from_messages([
     ("system", "You are {expert_name}, a {expert_domain} expert with a {persona_style} style. "
      "Your stance is: {stance}. Your skills include: {skills}.\n\n"
      "Research Context:\nTopic Frame: {topic_frame}\nKey Facts: {key_facts}\n"
      "Open Questions: {open_questions}\n\n"
-     "This is Round {round_number} of insight generation. "
      "Your previous insights in earlier rounds: {previous_insights}\n\n"
      "Generate ONE deep, original insight that leverages your unique expertise. "
      "Think beyond obvious observations."),
-    ("human", "Generate your insight for Round {round_number} on the topic: {topic}\n\n{format_instructions}"),
+    ("human", "Generate your insight on the topic: {topic}\n\n"
+     "Use {language}\n\n{format_instructions}"),
 ])
 
 
@@ -28,6 +31,7 @@ async def insight_refinement_node(state: NeobeeState) -> dict:
     """Generate insights per expert per round, with pause/resume support."""
     print("===== Insight Refinement Node =====")
     session = state["session"]
+    language = "English" if session.language == "en" else "Chinese"
     brief = state.get("research_brief")
     experts = state.get("experts", [])
     existing_rounds = list(state.get("rounds", []))
@@ -62,8 +66,7 @@ async def insight_refinement_node(state: NeobeeState) -> dict:
                     if existing_round.expert_id == expert.id and existing_round.round < rn:
                         for ins in existing_round.insights:
                             prev_insights.append(ins.insight)
-                ins = await _generate_single_insight(session, brief, expert, rn, prev_insights)
-                print(f"  Generated insight: expert={expert.name}, round={rn}")
+                ins = await _generate_single_insight(language, session, brief, expert, rn, prev_insights)
                 return ei, ins
 
             insights = await asyncio.gather(*[gen_for_expert(ei) for ei in expert_indices])
@@ -91,7 +94,7 @@ async def insight_refinement_node(state: NeobeeState) -> dict:
 
 
 async def _generate_single_insight(
-    session, brief, expert, round_number: int, previous_insights: list[str]
+    language, session, brief, expert, round_number: int, previous_insights: list[str]
 ) -> Insight:
     """Generate a single insight for one expert-round combination."""
     parser = PydanticOutputParser(pydantic_object=InsightOutput)
@@ -105,12 +108,13 @@ async def _generate_single_insight(
         topic_frame=brief.topic_frame,
         key_facts="\n".join(brief.key_facts) if brief.key_facts else "N/A",
         open_questions="\n".join(brief.open_questions) if brief.open_questions else "N/A",
-        round_number=round_number,
         previous_insights="\n".join(previous_insights) if previous_insights else "None yet",
         topic=session.topic,
+        language=language,
         format_instructions=parser.get_format_instructions(),
     )
-    result = await llm.ainvoke(messages)
+    async with _semaphore:
+        result = await llm.ainvoke(messages)
     parsed = parser.parse(result.content)
     return Insight(
         round=round_number,

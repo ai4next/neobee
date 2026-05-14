@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -396,7 +395,22 @@ class Orchestrator:
         builder.add_edge("complete_session", END)
         builder.add_edge("fail_session", END)
 
-        return builder.compile(checkpointer=MemorySaver(serde=JsonPlusSerializer()))
+        return builder.compile(checkpointer=MemorySaver(
+            serde=JsonPlusSerializer(allowed_msgpack_modules=[
+                ("neobee.models", "SessionStatus"),
+                ("neobee.models", "SessionStage"),
+                ("neobee.models", "SessionRecord"),
+                ("neobee.models", "ResearchBrief"),
+                ("neobee.models", "ExpertProfile"),
+                ("neobee.models", "SessionRound"),
+                ("neobee.models", "ReviewScore"),
+                ("neobee.models", "IdeaCandidate"),
+                ("neobee.models", "InsightRefinementCursor"),
+                ("neobee.models", "CrossReviewCursor"),
+                ("neobee.models", "SessionEventType"),
+                ("neobee.models", "SessionEvent"),
+            ]),
+        ))
 
     def start_session_sync(self, session_id: str,
                            session_record: Optional[SessionRecord] = None) -> None:

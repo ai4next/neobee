@@ -30,7 +30,8 @@ PROMPT_FACT_EXTRACT = ChatPromptTemplate.from_messages([
 PROMPT_SYNTHESIS = ChatPromptTemplate.from_messages([
     ("system", "You are a research analyst. Synthesize the collected information into a comprehensive research brief. "
      "Include a 360-degree topic frame, key facts with source attribution, open questions, emerging signals/trends, and source references."),
-    ("human", "First round facts: {first_facts}\n\nSecond round facts: {second_facts}\n\nGap queries: {gap_queries}\n\nProduce the final research brief.\n\n{format_instructions}"),
+    ("human", "First round facts: {first_facts}\n\nSecond round facts: {second_facts}\n\nGap queries: {gap_queries}\n\nProduce the final research brief.\n\n"
+     "Use {language}\n\n{format_instructions}"),
 ])
 
 
@@ -57,13 +58,14 @@ async def _run_fact_extraction(results_text: str) -> FactExtractionOutput:
     return parser.parse(result.content)
 
 
-async def _run_synthesis(first_facts: list[str], second_facts: list[str], gap_queries: list[str]) -> SynthesisOutput:
+async def _run_synthesis(language: str, first_facts: list[str], second_facts: list[str], gap_queries: list[str]) -> SynthesisOutput:
     parser = PydanticOutputParser(pydantic_object=SynthesisOutput)
     llm = get_llm("deep_research")
     messages = PROMPT_SYNTHESIS.format_messages(
         first_facts="\n".join(first_facts),
         second_facts="\n".join(second_facts),
         gap_queries="\n".join(gap_queries),
+        language=language,
         format_instructions=parser.get_format_instructions(),
     )
     result = await llm.ainvoke(messages)
@@ -74,6 +76,7 @@ async def deep_research_node(state: NeobeeState) -> dict:
     """Five sub-stage deep research: query gen -> search-1 -> fact extract -> search-2 -> synthesis."""
     print("===== Deep Research Node =====")
     session = state["session"]
+    language = "English" if session.language == "en" else "Chinese"
     tracker = _get_tracker()
     task_id = state.get("task_id")
 
@@ -84,10 +87,8 @@ async def deep_research_node(state: NeobeeState) -> dict:
     try:
         # Sub-stage 1: Query generation (LLM-1)
         _progress(15, "generating search queries")
-        print("Generating search queries...")
         queries = await _run_query_gen(session)
         all_queries = [queries.primary_query] + queries.sub_queries
-        print(f"Generated queries: {all_queries}")
 
         # Sub-stage 2: First round broad search (Search-1)
         _progress(30, "searching round 1")
@@ -137,7 +138,7 @@ async def deep_research_node(state: NeobeeState) -> dict:
 
         # Sub-stage 5: Synthesis (LLM-3)
         _progress(80, "synthesizing research brief")
-        synthesis = await _run_synthesis(first_facts, [second_results_text], gap_queries)
+        synthesis = await _run_synthesis(language, first_facts, [second_results_text], gap_queries)
 
         brief = ResearchBrief(
             topic_frame=synthesis.topic_frame,

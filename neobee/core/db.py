@@ -8,8 +8,11 @@ from typing import Optional
 
 from neobee.core.config import CONFIG_DIR
 from neobee.models import (
+    CrossReviewCursor,
+    ExpertProfile,
     IdeaCandidate,
     Insight,
+    InsightRefinementCursor,
     ResearchBrief,
     ReviewScore,
     SessionAggregate,
@@ -331,7 +334,6 @@ def upsert_experts(session_id: str, experts: list) -> None:
 
 
 def get_experts(session_id: str) -> list:
-    from neobee.models import ExpertProfile
     conn = get_db()
     rows = conn.execute("SELECT * FROM expert_creation_data WHERE session_id = ? ORDER BY id", (session_id,)).fetchall()
     return [
@@ -349,15 +351,16 @@ def upsert_rounds(session_id: str, rounds: list[SessionRound]) -> None:
     conn.execute("DELETE FROM insight_refinement_data WHERE session_id = ?", (session_id,))
     for sr in rounds:
         for ins in sr.insights:
-            conn.execute(
+            cursor = conn.execute(
                 "INSERT INTO insight_refinement_data (session_id, round_number, expert_id, insight, rationale) VALUES (?, ?, ?, ?, ?)",
                 (session_id, sr.round, sr.expert_id, ins.insight, ins.rationale),
             )
+            # Use the DB row id as canonical insight id — ensures round-trip consistency
+            ins.id = str(cursor.lastrowid)
     conn.commit()
 
 
 def get_rounds(session_id: str) -> list[SessionRound]:
-    from neobee.models import ExpertProfile
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM insight_refinement_data WHERE session_id = ? ORDER BY round_number, id", (session_id,)
@@ -368,6 +371,7 @@ def get_rounds(session_id: str) -> list[SessionRound]:
         if key not in rounds_map:
             rounds_map[key] = SessionRound(round=r["round_number"], expert_id=r["expert_id"])
         rounds_map[key].insights.append(Insight(
+            id=str(r["id"]),
             insight=r["insight"],
             rationale=r["rationale"],
             round=r["round_number"],
@@ -473,7 +477,6 @@ def get_checkpoint(session_id: str) -> Optional[SessionCheckpoint]:
     row = conn.execute("SELECT * FROM session_checkpoint WHERE session_id = ?", (session_id,)).fetchone()
     if not row:
         return None
-    from neobee.models import CrossReviewCursor, ExpertProfile, IdeaCandidate, InsightRefinementCursor, ResearchBrief, ReviewScore, SessionRound
     return SessionCheckpoint(
         completed_stages=json.loads(row["completed_stages"]) if row["completed_stages"] else [],
         current_stage=row["current_stage"],

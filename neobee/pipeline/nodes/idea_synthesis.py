@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 from math import floor
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
-from neobee.models import IdeaBatchOutput, IdeaCandidate, Insight, ReviewScore, SessionRound
+from neobee.models import IdeaBatchOutput, IdeaCandidate, Insight
+from neobee.pipeline._utils import _aggregate_scores, _retry_llm
 from neobee.pipeline.state import NeobeeState
 
 PROMPT = ChatPromptTemplate.from_messages([
@@ -17,21 +17,11 @@ PROMPT = ChatPromptTemplate.from_messages([
      "Open Questions: {open_questions}\n\n"
      "Insights with their aggregate review scores:\n{scored_insights}\n\n"
      "Generate {num_ideas} startup idea(s) based on this analysis."),
-    ("human", "Generate startup ideas for the topic: {topic}\n\n{format_instructions}"),
+    ("human", "Generate startup ideas for the topic: {topic}\n\n"
+     "Use {language}\n\n{format_instructions}"),
 ])
 
 BATCH_SIZE = 20
-
-
-def _group_reviews_by_insight(reviews: list[ReviewScore]) -> dict[str, float]:
-    scores: dict[str, list[float]] = {}
-    for rev in reviews:
-        if rev.insight_id not in scores:
-            scores[rev.insight_id] = []
-        avg = (rev.novelty + rev.usefulness + rev.feasibility +
-               rev.evidence_strength + rev.cross_domain_leverage + rev.risk_awareness) / 6
-        scores[rev.insight_id].append(avg)
-    return {iid: sum(v) / len(v) for iid, v in scores.items()}
 
 
 def _format_scored_insights(insights: list[Insight], scores: dict[str, float]) -> str:
@@ -46,6 +36,7 @@ async def idea_synthesis_node(state: NeobeeState) -> dict:
     """Generate startup ideas from insights and reviews."""
     print("===== Idea Synthesis Node =====")
     session = state["session"]
+    language = "English" if session.language == "en" else "Chinese"
     brief = state.get("research_brief")
     rounds = state.get("rounds", [])
     reviews = state.get("reviews", [])
@@ -60,8 +51,7 @@ async def idea_synthesis_node(state: NeobeeState) -> dict:
     if not all_insights:
         return {"error": "No insights to synthesize ideas from"}
 
-    score_map = _group_reviews_by_insight(reviews)
-
+    score_map = _aggregate_scores(reviews)
     all_ideas: list[IdeaCandidate] = []
 
     try:
@@ -70,33 +60,29 @@ async def idea_synthesis_node(state: NeobeeState) -> dict:
             num_ideas = max(1, floor(len(batch) / 2))
             scored_text = _format_scored_insights(batch, score_map)
 
+            # Per-batch average score instead of global average
+            batch_scores = [score_map.get(ins.id, 0) for ins in batch if ins.id in score_map]
+            batch_avg = sum(batch_scores) / len(batch_scores) if batch_scores else 0.0
+
             parser = PydanticOutputParser(pydantic_object=IdeaBatchOutput)
             llm = get_llm("idea_synthesis")
-            retries = 2
-            for attempt in range(retries + 1):
-                try:
-                    messages = PROMPT.format_messages(
-                        topic_frame=brief.topic_frame,
-                        key_facts="\n".join(brief.key_facts) if brief.key_facts else "N/A",
-                        open_questions="\n".join(brief.open_questions) if brief.open_questions else "N/A",
-                        scored_insights=scored_text,
-                        num_ideas=num_ideas,
-                        topic=session.topic,
-                        format_instructions=parser.get_format_instructions(),
-                    )
-                    result = await llm.ainvoke(messages)
-                    parsed = parser.parse(result.content)
-                    all_ideas.extend(parsed.ideas)
-                    break
-                except Exception:
-                    if attempt < retries:
-                        await asyncio.sleep(2 ** attempt)
-                    else:
-                        raise
+            messages = PROMPT.format_messages(
+                topic_frame=brief.topic_frame,
+                key_facts="\n".join(brief.key_facts) if brief.key_facts else "N/A",
+                open_questions="\n".join(brief.open_questions) if brief.open_questions else "N/A",
+                scored_insights=scored_text,
+                num_ideas=num_ideas,
+                topic=session.topic,
+                language=language,
+                format_instructions=parser.get_format_instructions(),
+            )
+            result = await _retry_llm(llm.ainvoke(messages))
+            parsed = parser.parse(result.content)
 
-        for idea in all_ideas:
-            if score_map:
-                idea.total_score = sum(score_map.values()) / len(score_map)
+            for idea in parsed.ideas:
+                idea.total_score = batch_avg
+
+            all_ideas.extend(parsed.ideas)
 
         return {"ideas": all_ideas, "error": None}
 

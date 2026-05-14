@@ -12,8 +12,23 @@ def render_topic_form(language: str = "en") -> tuple[bool, dict]:
         with col1:
             rounds = st.number_input("Rounds" if en else "轮次", min_value=1, max_value=10, value=3)
         with col2:
-            experts = st.number_input("Experts" if en else "专家数", min_value=1, max_value=10, value=3)
+            experts = st.number_input("Experts" if en else "专家数", min_value=1, max_value=100, value=3)
         additional_info = st.text_area("Additional Info" if en else "补充信息", placeholder="Optional context..." if en else "可选补充信息...")
+
+        # Warm about large expert counts
+        if experts > 20:
+            st.caption(
+                "⚠️ Large expert counts will be generated in batches and may take several minutes."
+                if en else
+                "⚠️ 大量专家将分批生成，可能需要数分钟时间。"
+            )
+        elif experts > 50:
+            st.caption(
+                "⚠️ Very large expert counts may take 5-10 minutes and consume significant API quota."
+                if en else
+                "⚠️ 超大量专家可能需要 5-10 分钟并消耗较多 API 配额。"
+            )
+
         submitted = st.form_submit_button("Launch Brainstorm 🚀", width='stretch')
 
         if submitted and topic.strip():

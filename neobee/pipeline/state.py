@@ -22,7 +22,7 @@ class NeobeeState(TypedDict):
     ideas: list[IdeaCandidate]
     error: Optional[str]
     insight_cursor: Optional[dict]  # {expert_index: int, round_index: int}
-    cross_review_cursor: Optional[dict]  # {completed_expert_ids: list[str]}
+    cross_review_cursor: Optional[dict]  # {completed_expert_ids: list[str]} (cross-domain sampling)
     task_id: Optional[int]
     _resume_target: Optional[str]
 
