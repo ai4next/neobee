@@ -20,6 +20,11 @@ async def _retry_llm(coro, retries: int = 2) -> T:
                 raise
 
 
+def _aggregate_reviews(reviews: list[ReviewScore]) -> dict[str, ReviewScore]:
+    """Group reviews by insight_id and return the most recent one."""
+    return {review.insight_id: review for review in reviews}
+
+
 def _aggregate_scores(reviews: list[ReviewScore]) -> dict[str, float]:
     """Group reviews by insight_id and return average dimension score (1-10) per insight."""
     scores: dict[str, list[float]] = {}
@@ -31,7 +36,13 @@ def _aggregate_scores(reviews: list[ReviewScore]) -> dict[str, float]:
 
 
 def _aggregate_scores_sum(reviews: list[ReviewScore]) -> dict[str, float]:
-    """Group reviews by insight_id and return average total score (out of 60) per insight."""
+    """Group reviews by insight_id and return total score (out of 60) per insight."""
+    scores: dict[str, list[float]] = {}
+    for rev in reviews:
+        total = (rev.novelty + rev.usefulness + rev.feasibility +
+                 rev.evidence_strength + rev.cross_domain_leverage + rev.risk_awareness)
+        scores.setdefault(rev.insight_id, []).append(total)
+    return {iid: sum(v) / len(v) for iid, v in scores.items()}
     scores: dict[str, list[float]] = {}
     for rev in reviews:
         total = (rev.novelty + rev.usefulness + rev.feasibility +

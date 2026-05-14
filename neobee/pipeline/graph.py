@@ -19,10 +19,10 @@ from neobee.models import (
 )
 from neobee.pipeline.nodes import (
     cross_review_node,
+    debate_insight_node,
     deep_research_node,
     expert_creation_node,
-    idea_synthesis_node,
-    insight_refinement_node,
+    idea_factory_node,
 )
 from neobee.pipeline.state import NeobeeState, make_initial_state
 from neobee.pipeline.task_tracker import TaskTracker
@@ -172,7 +172,7 @@ async def expert_creation_wrapper(state: NeobeeState) -> dict:
     return result
 
 
-async def insight_refinement_wrapper(state: NeobeeState) -> dict:
+async def debate_insight_wrapper(state: NeobeeState) -> dict:
     session = state["session"]
     stage = SessionStage.INSIGHT_REFINEMENT
     tracker = _get_tracker()
@@ -189,7 +189,7 @@ async def insight_refinement_wrapper(state: NeobeeState) -> dict:
         emit_event(session.id, SessionEventType.SESSION_PAUSED, stage)
         return {"error": None, "_paused": True, "task_id": task_id}
 
-    result = await insight_refinement_node(state)
+    result = await debate_insight_node(state)
 
     if result.get("error"):
         tracker.fail_task(session.id, "insight_refinement", task_id, result["error"])
@@ -248,7 +248,7 @@ async def cross_review_wrapper(state: NeobeeState) -> dict:
     return result
 
 
-async def idea_synthesis_wrapper(state: NeobeeState) -> dict:
+async def idea_factory_wrapper(state: NeobeeState) -> dict:
     session = state["session"]
     stage = SessionStage.IDEA_SYNTHESIS
     tracker = _get_tracker()
@@ -265,7 +265,7 @@ async def idea_synthesis_wrapper(state: NeobeeState) -> dict:
         emit_event(session.id, SessionEventType.SESSION_PAUSED, stage)
         return {"error": None, "_paused": True, "task_id": task_id}
 
-    result = await idea_synthesis_node(state)
+    result = await idea_factory_node(state)
 
     if result.get("error"):
         tracker.fail_task(session.id, "idea_synthesis", task_id, result["error"])
@@ -316,6 +316,7 @@ def _build_checkpoint(state: NeobeeState, stage: str) -> SessionCheckpoint:
     return SessionCheckpoint(
         current_stage=stage,
         research_brief=state.get("research_brief"),
+        opportunity_map=state.get("opportunity_map"),
         experts=state.get("experts", []),
         rounds=state.get("rounds", []),
         reviews=state.get("reviews", []),
@@ -346,9 +347,9 @@ class Orchestrator:
         builder.add_node("start_router", start_router)
         builder.add_node("deep_research", deep_research_wrapper)
         builder.add_node("expert_creation", expert_creation_wrapper)
-        builder.add_node("insight_refinement", insight_refinement_wrapper)
+        builder.add_node("insight_refinement", debate_insight_wrapper)
         builder.add_node("cross_review", cross_review_wrapper)
-        builder.add_node("idea_synthesis", idea_synthesis_wrapper)
+        builder.add_node("idea_synthesis", idea_factory_wrapper)
         builder.add_node("complete_session", complete_session_node)
         builder.add_node("fail_session", fail_session_node)
 
@@ -401,6 +402,7 @@ class Orchestrator:
                 ("neobee.models", "SessionStage"),
                 ("neobee.models", "SessionRecord"),
                 ("neobee.models", "ResearchBrief"),
+                ("neobee.models", "OpportunityMap"),
                 ("neobee.models", "ExpertProfile"),
                 ("neobee.models", "SessionRound"),
                 ("neobee.models", "ReviewScore"),
@@ -440,6 +442,7 @@ class Orchestrator:
             state = {
                 "session": session_record,
                 "research_brief": cp.research_brief,
+                "opportunity_map": cp.opportunity_map,
                 "experts": cp.experts,
                 "rounds": cp.rounds,
                 "reviews": cp.reviews,
@@ -464,6 +467,7 @@ class Orchestrator:
             state["experts"] = db_module.get_experts(session_id)
             state["rounds"] = db_module.get_rounds(session_id)
             state["reviews"] = db_module.get_reviews(session_id)
+            state["opportunity_map"] = None
             state["ideas"] = db_module.get_ideas(session_id)
             state["_resume_target"] = session_record.current_stage.value
         else:
