@@ -211,7 +211,6 @@ async def debate_insight_wrapper(state: NeobeeState) -> dict:
     return result
 
 
-<<<<<<< HEAD
 async def cross_review_wrapper(state: NeobeeState) -> dict:
     session = state["session"]
     stage = SessionStage.CROSS_REVIEW
@@ -249,8 +248,6 @@ async def cross_review_wrapper(state: NeobeeState) -> dict:
     return result
 
 
-=======
->>>>>>> 9a6d061 (feat: wire debate_insight and idea_factory nodes into graph)
 async def idea_factory_wrapper(state: NeobeeState) -> dict:
     session = state["session"]
     stage = SessionStage.IDEA_SYNTHESIS
