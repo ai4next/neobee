@@ -5,7 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
 from neobee.models import ExpertProfile, ExpertsOutput
-from neobee.pipeline._registry import _get_tracker
+from neobee.pipeline._utils import _make_progress
 from neobee.pipeline.state import NeobeeState
 
 BATCH_SIZE = 25
@@ -31,20 +31,15 @@ PROMPT_SINGLE_BATCH = ChatPromptTemplate.from_messages([
 
 async def expert_creation_node(state: NeobeeState) -> dict:
     """Generate expert personas from the research brief, with batching for large counts."""
-    print("===== EXPERT CREATION NODE =====")
+    print("===== Expert Creation Node =====")
     session = state["session"]
     language = "English" if session.language == "en" else "Chinese"
     brief = state.get("research_brief")
     opportunity_map = state.get("opportunity_map")
-    tracker = _get_tracker()
-    task_id = state.get("task_id")
+    progress = _make_progress(session.id, "expert_creation", state.get("task_id"))
 
     if not brief:
         return {"error": "Research brief is required for expert creation", "experts": []}
-
-    def _progress(pct: int, step: str) -> None:
-        if tracker and task_id:
-            tracker.update_progress(session.id, "expert_creation", task_id, pct, step)
 
     try:
         total_needed = session.expert_count
@@ -52,7 +47,7 @@ async def expert_creation_node(state: NeobeeState) -> dict:
         llm = get_llm("expert_creation")
         all_experts: list[ExpertProfile] = []
 
-        _progress(5, "generating expert personas")
+        progress(5, "generating expert personas")
 
         # Build opportunity areas context
         opportunity_areas_text = "None identified"
@@ -103,14 +98,14 @@ async def expert_creation_node(state: NeobeeState) -> dict:
                     expert.id = uuid.uuid4().hex
 
             pct = 10 + int(85 * (batch_idx + 1) / num_batches)
-            _progress(pct, f"generated batch {batch_idx + 1}/{num_batches}")
+            progress(pct, f"generated batch {batch_idx + 1}/{num_batches}")
 
         # Trim to exact count requested
         all_experts = all_experts[:total_needed]
 
-        _progress(100, "completed")
+        progress(100, "completed")
         return {"experts": all_experts, "error": None}
 
     except Exception as e:
-        _progress(0, "failed")
+        progress(0, "failed")
         return {"experts": [], "error": str(e)}

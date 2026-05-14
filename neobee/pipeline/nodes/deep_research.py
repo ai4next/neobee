@@ -16,7 +16,7 @@ from neobee.models import (
 from neobee.pipeline.nodes.opportunity_map import generate_opportunity_map
 from neobee.pipeline.state import NeobeeState
 
-from neobee.pipeline._registry import _get_tracker
+from neobee.pipeline._utils import _make_progress
 
 PROMPT_QUERY_GEN = ChatPromptTemplate.from_messages([
     ("system", "You are a research strategist. Given a topic, generate search queries to gather comprehensive information.\n\nTopic: {topic}\nAdditional Context: {additional_info}"),
@@ -78,21 +78,16 @@ async def deep_research_node(state: NeobeeState) -> dict:
     print("===== Deep Research Node =====")
     session = state["session"]
     language = "English" if session.language == "en" else "Chinese"
-    tracker = _get_tracker()
-    task_id = state.get("task_id")
-
-    def _progress(pct: int, step: str) -> None:
-        if tracker and task_id:
-            tracker.update_progress(session.id, "deep_research", task_id, pct, step)
+    progress = _make_progress(session.id, "deep_research", state.get("task_id"))
 
     try:
         # Sub-stage 1: Query generation (LLM-1)
-        _progress(15, "generating search queries")
+        progress(15, "generating search queries")
         queries = await _run_query_gen(session)
         all_queries = [queries.primary_query] + queries.sub_queries
 
         # Sub-stage 2: First round broad search (Search-1)
-        _progress(30, "searching round 1")
+        progress(30, "searching round 1")
         first_results = []
         search_tasks = [asyncio.to_thread(search, q, num_results=5) for q in all_queries]
         responses = await asyncio.gather(*search_tasks, return_exceptions=True)
@@ -114,12 +109,12 @@ async def deep_research_node(state: NeobeeState) -> dict:
         )
 
         # Sub-stage 3: Fact extraction & gap identification (LLM-2)
-        _progress(50, "extracting facts and gaps")
+        progress(50, "extracting facts and gaps")
         first_facts_output = await _run_fact_extraction(results_text)
         first_facts = first_facts_output.facts
 
         # Sub-stage 4: Second round targeted search (Search-2)
-        _progress(65, "searching knowledge gaps")
+        progress(65, "searching knowledge gaps")
         gap_queries = first_facts_output.knowledge_gaps[:5]
         second_results = []
         gap_search_tasks = [asyncio.to_thread(search, q, num_results=3) for q in gap_queries]
@@ -138,7 +133,7 @@ async def deep_research_node(state: NeobeeState) -> dict:
         ) if second_results else "No additional results found."
 
         # Sub-stage 5: Synthesis (LLM-3)
-        _progress(80, "synthesizing research brief")
+        progress(80, "synthesizing research brief")
         synthesis = await _run_synthesis(language, first_facts, [second_results_text], gap_queries)
 
         brief = ResearchBrief(
@@ -150,10 +145,10 @@ async def deep_research_node(state: NeobeeState) -> dict:
         )
 
         # Sub-stage 6: Opportunity Map generation (best-effort)
-        _progress(90, "generating opportunity map")
+        progress(90, "generating opportunity map")
         opp_map = await generate_opportunity_map(brief, language)
 
-        _progress(100, "completed")
+        progress(100, "completed")
         result = {"research_brief": brief, "error": None}
         if opp_map:
             result["opportunity_map"] = opp_map

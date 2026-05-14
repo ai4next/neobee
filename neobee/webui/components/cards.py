@@ -123,7 +123,7 @@ def render_ideas_card(ideas: list[IdeaCandidate], language: str = "en") -> None:
             with col1:
                 st.markdown(f"### {i + 1}. {idea.title}")
             with col2:
-                score_color = "green" if idea.total_score >= 7 else "orange" if idea.total_score >= 4 else "red"
+                score_color = "#2DD4BF" if idea.total_score >= 7 else "#F59E0B" if idea.total_score >= 4 else "#FB7185"
                 st.markdown(
                     f"<h3 style='color:{score_color}; text-align:right;'>{idea.total_score:.1f}</h3>",
                     unsafe_allow_html=True,

@@ -34,12 +34,12 @@ div[data-testid^="sr_"] div[data-testid="column"]:last-child button {
     height: 28px !important;
     font-size: 13px !important;
     line-height: 1 !important;
-    color: #999 !important;
+    color: #94A3B8 !important;
     box-shadow: none !important;
     transition: color 0.15s ease !important;
 }
 div[data-testid^="sr_"] div[data-testid="column"]:last-child button:hover {
-    color: #e74c3c !important;
+    color: #FB7185 !important;
 }
 /* Style the popover content ── */
 div[data-testid="stPopoverBody"] button[kind="primary"] {

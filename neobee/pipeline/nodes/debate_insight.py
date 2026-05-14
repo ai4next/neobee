@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
 from neobee.models import Insight, InsightOutput, OpportunityMap, SessionRound
-from neobee.pipeline._registry import _get_tracker
+from neobee.pipeline._utils import _make_progress
 from neobee.pipeline.state import NeobeeState
 
 MAX_CONCURRENT_LLM = 20
@@ -93,21 +93,16 @@ async def debate_insight_node(state: NeobeeState) -> dict:
     opportunity_map = state.get("opportunity_map")
     existing_rounds = list(state.get("rounds", []))
     cursor = state.get("insight_cursor") or {"expert_index": 0, "round_index": 0, "debate_phase": "r1"}
-    tracker = _get_tracker()
-    task_id = state.get("task_id")
+    progress = _make_progress(session.id, "insight_refinement", state.get("task_id"))
 
     if not brief or not experts:
         return {"error": "Research brief and experts required for debate insight"}
 
-    def _progress(pct: int, step: str) -> None:
-        if tracker and task_id:
-            tracker.update_progress(session.id, "insight_refinement", task_id, pct, step)
-
     try:
-        _progress(5, "starting debate insight generation")
+        progress(5, "starting debate insight generation")
 
         # -- Round 1: Divergent (all experts in parallel) --
-        _progress(10, "round 1: divergent insights")
+        progress(10, "round 1: divergent insights")
         r1_insights: dict[str, Insight] = {}
 
         async def r1_for_expert(expert) -> Insight:
@@ -147,10 +142,10 @@ async def debate_insight_node(state: NeobeeState) -> dict:
         for expert, ins in zip(experts, r1_results):
             r1_insights[expert.id] = ins
 
-        _progress(35, "round 1 complete")
+        progress(35, "round 1 complete")
 
         # -- Round 2: Challenge (cross-area) --
-        _progress(40, "round 2: cross-area challenge")
+        progress(40, "round 2: cross-area challenge")
         r2_insights: dict[str, Insight] = {}
         cross_synergies_text = ""
         if opportunity_map and opportunity_map.cross_area_synergies:
@@ -201,10 +196,10 @@ async def debate_insight_node(state: NeobeeState) -> dict:
         for eid, ins in r2_results:
             r2_insights[eid] = ins
 
-        _progress(65, "round 2 complete")
+        progress(65, "round 2 complete")
 
         # -- Round 3: Synthesis (convergence) --
-        _progress(70, "round 3: synthesis")
+        progress(70, "round 3: synthesis")
         r3_insights: dict[str, Insight] = {}
 
         # Build all insights text for context
@@ -257,7 +252,7 @@ async def debate_insight_node(state: NeobeeState) -> dict:
         for eid, ins in r3_results:
             r3_insights[eid] = ins
 
-        _progress(90, "round 3 complete")
+        progress(90, "round 3 complete")
 
         # -- Build SessionRounds (only R3 insights feed into cross review) --
         new_rounds = list(existing_rounds)
@@ -267,7 +262,7 @@ async def debate_insight_node(state: NeobeeState) -> dict:
                 sr = SessionRound(round=3, expert_id=expert.id, insights=[r3])
                 new_rounds.append(sr)
 
-        _progress(100, "completed")
+        progress(100, "completed")
         return {"rounds": new_rounds, "insight_cursor": None, "error": None}
 
     except Exception as e:

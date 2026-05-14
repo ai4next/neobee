@@ -79,14 +79,14 @@ if current_session.status in _RUNNING_STATES:
     @keyframes neobee-dot-pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:0.2; }} }}
     .neobee-progress-dot {{
         display:inline-block; width:10px; height:10px; border-radius:50%;
-        background:#22C55E; margin-right:8px; vertical-align:middle;
+        background:#2DD4BF; margin-right:8px; vertical-align:middle;
         animation: neobee-dot-pulse 1.2s ease-in-out infinite;
     }}
     .neobee-progress-label {{
         font-size:0.9rem; color:#94A3B8; vertical-align:middle;
     }}
     .neobee-step-text {{
-        font-size:0.85rem; color:#64748B; text-align:right;
+        font-size:0.85rem; color:#94A3B8; text-align:right;
         padding-top:0.15rem;
     }}
     </style>
@@ -167,16 +167,16 @@ with tcol:
     stage_css_parts = []
     if is_completed:
         stage_css_parts.append(""".stTabs [data-baseweb="tab-list"] > button {
-color: #22C55E !important;
+color: #2DD4BF !important;
 }""")
     elif current_idx >= 0:
         completed_count = current_idx
         if completed_count > 0:
             stage_css_parts.append(f""".stTabs [data-baseweb="tab-list"] > button:nth-child(-n+{completed_count}) {{
-color: #22C55E !important;
+color: #2DD4BF !important;
 }}""")
         stage_css_parts.append(f""".stTabs [data-baseweb="tab-list"] > button:nth-child({current_idx + 1}) {{
-color: #60A5FA !important;
+color: #38BDF8 !important;
 animation: neobee-tab-blink 1.2s ease-in-out infinite;
 }}""")
 

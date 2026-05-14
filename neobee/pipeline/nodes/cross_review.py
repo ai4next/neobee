@@ -5,8 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
 from neobee.models import ExpertProfile, Insight, ReviewBatchOutput
-from neobee.pipeline._registry import _get_tracker
-from neobee.pipeline._utils import _retry_llm
+from neobee.pipeline._utils import _make_progress, _retry_llm
 from neobee.pipeline.state import NeobeeState
 
 PROMPT = ChatPromptTemplate.from_messages([
@@ -85,20 +84,15 @@ async def cross_review_node(state: NeobeeState) -> dict:
     each group, every expert reviews ALL insights from every other
     group member, guaranteeing complete coverage.
     """.format(GROUP_SIZE)
-    print("===== Cross Review Node (group-based) =====")
+    print("===== Cross Review Node =====")
     session = state["session"]
     experts = state.get("experts", [])
     rounds = state.get("rounds", [])
     cursor = state.get("cross_review_cursor") or {"completed_expert_ids": []}
-    tracker = _get_tracker()
-    task_id = state.get("task_id")
+    progress = _make_progress(session.id, "cross_review", state.get("task_id"))
 
     if not experts or not rounds:
         return {"error": "Experts and rounds required for cross review"}
-
-    def _progress(pct: int, step: str) -> None:
-        if tracker and task_id:
-            tracker.update_progress(session.id, "cross_review", task_id, pct, step)
 
     # Build lookup: expert_id -> list of their insights across all rounds
     expert_insights: dict[str, list[Insight]] = {}
@@ -117,7 +111,7 @@ async def cross_review_node(state: NeobeeState) -> dict:
         groups = _group_experts(experts)
         reviewed_count = len(completed_ids)
         language = "English" if session.language == "en" else "Chinese"
-        _progress(5, "starting grouped cross review")
+        progress(5, "starting grouped cross review")
 
         for group in groups:
             if len(group) < 2:
@@ -165,9 +159,9 @@ async def cross_review_node(state: NeobeeState) -> dict:
                 reviewed_count += 1
                 completed_ids.add(reviewer.id)
                 pct = 10 + int(90 * reviewed_count / total_experts)
-                _progress(pct, f"reviewed {reviewed_count}/{total_experts} experts")
+                progress(pct, f"reviewed {reviewed_count}/{total_experts} experts")
 
-        _progress(100, "completed")
+        progress(100, "completed")
         return {"reviews": all_reviews, "cross_review_cursor": None, "error": None}
 
     except Exception as e:
