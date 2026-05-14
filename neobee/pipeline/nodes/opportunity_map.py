@@ -4,7 +4,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from neobee.core.llm import get_llm
-from neobee.models import OpportunityArea, OpportunityMap, ResearchBrief
+from neobee.models import OpportunityMap, ResearchBrief
 from neobee.pipeline._utils import _retry_llm
 
 PROMPT = ChatPromptTemplate.from_messages([

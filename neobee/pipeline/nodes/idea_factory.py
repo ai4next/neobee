@@ -73,7 +73,7 @@ EVAL_WEIGHTS = {
     "bold": {"novelty": 0.45, "feasibility": 0.15, "market_potential": 0.15, "differentiation": 0.25},
     "safe": {"novelty": 0.15, "feasibility": 0.35, "market_potential": 0.35, "differentiation": 0.15},
 }
-PASS_THRESHOLD = 30  # out of 50
+PASS_THRESHOLD = 6.0  # out of max 10.0 (weighted score; raw score /10 * weight 1.0)
 INSIGHT_ALIGNMENT_MIN = 5
 
 

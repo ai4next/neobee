@@ -283,6 +283,43 @@ async def idea_factory_wrapper(state: NeobeeState) -> dict:
     return result
 
 
+async def cross_review_wrapper(state: NeobeeState) -> dict:
+    session = state["session"]
+    stage = SessionStage.CROSS_REVIEW
+    tracker = _get_tracker()
+    task_id = tracker.create_task(session.id, "cross_review")
+
+    emit_event(session.id, SessionEventType.CROSS_REVIEW_STARTED, stage)
+
+    if is_paused(session.id):
+        tracker.update_progress(session.id, "cross_review", task_id, 0, "paused")
+        cp = _build_checkpoint(state, "cross_review")
+        db_module.save_checkpoint(session.id, cp)
+        session.status = SessionStatus.PAUSED
+        db_module.update_session(session)
+        emit_event(session.id, SessionEventType.SESSION_PAUSED, stage)
+        return {"error": None, "_paused": True, "task_id": task_id}
+
+    result = await cross_review_node(state)
+
+    if result.get("error"):
+        tracker.fail_task(session.id, "cross_review", task_id, result["error"])
+        emit_event(session.id, SessionEventType.RUN_FAILED, stage, {"error": result["error"]})
+        db_module.append_error(session.id, result["error"])
+    else:
+        db_module.upsert_reviews(session.id, result["reviews"])
+        tracker.complete_task(session.id, "cross_review", task_id)
+        emit_event(session.id, SessionEventType.REVIEW_COMPLETED, stage)
+        session.current_stage = SessionStage.IDEA_SYNTHESIS
+        session.status = _session_status_for_stage(SessionStage.IDEA_SYNTHESIS)
+        db_module.update_session(session)
+        emit_event(session.id, SessionEventType.SESSION_STAGE_CHANGED, stage,
+                   {"next_stage": "idea_synthesis"})
+
+    result["task_id"] = task_id
+    return result
+
+
 # ── Terminal nodes ───────────────────────────────────────────────────────────
 
 async def complete_session_node(state: NeobeeState) -> dict:
